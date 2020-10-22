@@ -5,8 +5,10 @@ import scipy as sci
 import time as tm
 from scipy import io
 import importlib
-import iLQR_numpy
-importlib.reload(iLQR_numpy)
+from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR
+
+importlib.reload(iLQRSolver)
+
 
 if __name__ == "__main__":
     #################################
@@ -21,7 +23,7 @@ if __name__ == "__main__":
                 -sp.sqrt(d_constant_int**2 
                     - (h_constant_int**2)*(x_u[3]**2)*(sp.sin(x_u[4])**2))
     initial_states = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
-    dynamic_model = iLQR_numpy.dynamic_model_wrapper  (   
+    dynamic_model = DynamicModel.dynamic_model_wrapper  (   
                         sp.Array([  
                                     x_u[0] + b_function*sp.cos(x_u[2]), 
                                     x_u[1] + b_function*sp.sin(x_u[2]), 
@@ -33,13 +35,13 @@ if __name__ == "__main__":
     #################################
     C_matrix = np.diag([0.,1.,0.,1.,10.,10.])
     r_vector = np.asarray([0.,1.,0.,4.,0.,0.])
-    objective_function = iLQR_numpy.objective_function_wrapper((x_u - r_vector)@C_matrix@(x_u - r_vector), x_u)
+    objective_function = ObjectiveFunction.objective_function_wrapper((x_u - r_vector)@C_matrix@(x_u - r_vector), x_u)
     #################################
     ## Parameters of the vehicle ####
     #################################
     T_int = 100
 
-    iLQR_vanilla = iLQR_numpy.iLQR_wrapper(dynamic_model, objective_function, T_int)
+    iLQR_vanilla = iLQR.iLQR_wrapper(dynamic_model, objective_function, T_int)
     
     print(  "################################\n"+
             "#######Starting Iteration#######\n"+
