@@ -4,32 +4,15 @@ import sympy as sp
 import scipy as sci
 import time as tm
 from scipy import io
-import importlib
 from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR
-
-importlib.reload(iLQRSolver)
-
 
 if __name__ == "__main__":
     #################################
     ##### Model of the vehicle ######
     #################################
-    x_u = sp.symbols('x_u:6')
-    d_constant_int = 3
-    h_constant_int = 0.1
-    h_d_constant_int = h_constant_int/d_constant_int
-    b_function = d_constant_int \
-                + h_constant_int*x_u[3]*sp.cos(x_u[4])\
-                -sp.sqrt(d_constant_int**2 
-                    - (h_constant_int**2)*(x_u[3]**2)*(sp.sin(x_u[4])**2))
+    vehicle, x_u, _, _ = DynamicModel.vehicle()
     initial_states = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
-    dynamic_model = DynamicModel.dynamic_model_wrapper  (   
-                        sp.Array([  
-                                    x_u[0] + b_function*sp.cos(x_u[2]), 
-                                    x_u[1] + b_function*sp.sin(x_u[2]), 
-                                    x_u[2] + sp.asin(h_d_constant_int*x_u[3]*sp.sin(x_u[4])), 
-                                    x_u[3]+h_constant_int*x_u[5]
-                                ]), x_u, initial_states)
+    dynamic_model = DynamicModel.dynamic_model_wrapper(vehicle, x_u, initial_states)
     #################################
     ###### Weighting Matrices #######
     #################################

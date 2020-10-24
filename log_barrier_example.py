@@ -4,28 +4,16 @@ import sympy as sp
 import time as tm
 from scipy import io
 import importlib
-import iLQR_numpy
-importlib.reload(iLQR_numpy)
+from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR
 
 if __name__ == "__main__":
     #################################
     ##### Model of the vehicle ######
     #################################
-    x_u = sp.symbols('x_u:6')
-    d_constant_int = 3
-    h_constant_int = 0.1
-    h_d_constant_int = h_constant_int/d_constant_int
-    b_function = d_constant_int \
-                + h_constant_int*x_u[3]*sp.cos(x_u[4])\
-                -sp.sqrt(d_constant_int**2 - (h_constant_int**2)*(x_u[3]**2)*(sp.sin(x_u[4])**2))
-    initial_states = np.asarray([0,0,0,4],dtype=np.float64).reshape(-1,1)
-    dynamic_model = iLQR_numpy.dynamic_model_wrapper  (    
-                        sp.Array([  
-                                    x_u[0] + b_function*sp.cos(x_u[2]), 
-                                    x_u[1] + b_function*sp.sin(x_u[2]), 
-                                    x_u[2] + sp.asin(h_d_constant_int*x_u[3]*sp.sin(x_u[4])), 
-                                    x_u[3]+h_constant_int*x_u[5]
-                                ]), x_u, initial_states)
+    h_constant = 0.1 # step size
+    vehicle, x_u, n_int, m_int = DynamicModel.vehicle(h_constant)
+    initial_states = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
+    dynamic_model = DynamicModel.dynamic_model_wrapper(vehicle, x_u, initial_states)
     #################################
     ## Constraints of the vehicle ###
     #################################
@@ -56,8 +44,6 @@ if __name__ == "__main__":
     #################################
     # Parameters of the ego vehicle
     T_int = 60
-    n_int = 4
-    m_int = 2
     # Parameters of the obstacle
     obs1_x0 = 20
     obs1_y0 = 0
@@ -68,24 +54,23 @@ if __name__ == "__main__":
 
     # There are totally 5 additional variables
     # [t, obs1_x, obs1_y, obs2_x, obs2_y]
-    objective_function = iLQR_numpy.objective_function_log_barrier_class   (
+    objective_function = ObjectiveFunction.objective_function_log_barrier_class   (
                                                                             (x_u - r_vector)@C_matrix@(x_u - r_vector),
                                                                             x_u,
                                                                             inequality_constraints_list,
                                                                             [obs1_x, obs1_y, obs2_x, obs2_y]
                                                                 )
                                                                 
-#%%
 if __name__ == "__main__":
     # Therefore, the additional parameters for the feedfoward pass show in the shape(T_int, 5)
     # The first one is the log barrier parameter t, the remainings are the position of the obstacle
     additional_obj_parameters_matrix = np.zeros((T_int, 5))
     for tau in range(T_int):
-        additional_obj_parameters_matrix[tau] = np.asarray((0.5,    obs1_x0+h_constant_int*obs1_velocity*tau, obs1_y0, 
-                                                                    obs2_x0+h_constant_int*obs2_velocity*tau, obs2_y0),
+        additional_obj_parameters_matrix[tau] = np.asarray((0.5,    obs1_x0+h_constant*obs1_velocity*tau, obs1_y0, 
+                                                                    obs2_x0+h_constant*obs2_velocity*tau, obs2_y0),
                                                                     dtype = np.float64)
 
-    iLQR_log_barrier = iLQR_numpy.iLQR_log_barrier_class(   dynamic_model, 
+    iLQR_log_barrier = iLQR.iLQR_log_barrier_class(   dynamic_model, 
                                                             objective_function,T_int,
                                                             additional_variables_for_objective_function = additional_obj_parameters_matrix)
     print(  "################################\n"+

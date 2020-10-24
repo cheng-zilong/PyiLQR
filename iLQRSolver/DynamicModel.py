@@ -126,3 +126,34 @@ class dynamic_model_wrapper(object):
         for tau in range(1, T_int):
             F_matrix_list[tau] = np.asarray(gradient_dynamic_model_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64)
         return F_matrix_list
+
+def vehicle(h_constant = 0.1):
+    """Model of a vehicle
+
+        Paramters
+        --------
+        h_constant : float
+            step size
+
+        Return
+        --------
+        system
+        x_u
+        n_int
+        m_int
+        
+    """
+    x_u = sp.symbols('x_u:6')
+    d_constant_int = 3
+    h_d_constant_int = h_constant/d_constant_int
+    b_function = d_constant_int \
+                + h_constant*x_u[3]*sp.cos(x_u[4]) \
+                -sp.sqrt(d_constant_int**2 
+                    - (h_constant**2)*(x_u[3]**2)*(sp.sin(x_u[4])**2))
+    system = sp.Array([  
+                x_u[0] + b_function*sp.cos(x_u[2]), 
+                x_u[1] + b_function*sp.sin(x_u[2]), 
+                x_u[2] + sp.asin(h_d_constant_int*x_u[3]*sp.sin(x_u[4])), 
+                x_u[3]+h_constant*x_u[5]
+            ])
+    return system, x_u, 4, 2
