@@ -32,28 +32,30 @@ if __name__ == "__main__":
     u0_upper_bound = [0.3,3]
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, dataset_size=100)
     dataset_train.update_train_set(dynamic_model.evaluate_trajectory())
-    nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(DynamicModel.DummyNetwork(n_int+m_int, n_int))
-    nn_dynamic_model.train(dataset_train)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, dataset_size=10) 
-    nn_dynamic_model.validate(dataset_vali)
-    print(  "################################\n"+
-            "#######Starting Iteration#######\n"+
-            "################################\n"+
-            "Initial Cost: %.5e"%(iLQR_vanilla.objective_function_value_last))
-    iLQR_vanilla.backward_pass()
-    iLQR_vanilla.forward_pass()
-    time1 = tm.time()
-    for i in range(100):
-        time2 = tm.time()
-        iLQR_vanilla.backward_pass()
-        time3 = tm.time()
-        (obj, isStop) = iLQR_vanilla.forward_pass()
-        time4 = tm.time()
-        print("Iteration No.%3d\t Backward Time:%.3e\t Forward Time:%.3e\t Obj. Value:%.8e\t"%(i,time3-time2,time4-time3,obj))
-        if isStop:
-            break
-    time5 = tm.time()
-    print("Completed! All Time:%.5e"%(time5-time1))
-    io.savemat("test.mat",{"result": iLQR_vanilla.trajectory_list})  
+    nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(DynamicModel.DummyNetwork(n_int+m_int, n_int), lr = 0.0001)
+    nn_dynamic_model.train(dataset_train, dataset_vali, max_epoch=50000)
+
+    nn_dynamic_model.evaluate(torch.tensor([[0,0,0,0,0,0]]).float().cuda())
+    nn_dynamic_model.evaluate(torch.tensor([[0,0,0,4,0,0]]).float().cuda())
+    # print(  "################################\n"+
+    #         "#######Starting Iteration#######\n"+
+    #         "################################\n"+
+    #         "Initial Cost: %.5e"%(iLQR_vanilla.objective_function_value_last))
+    # iLQR_vanilla.backward_pass()
+    # iLQR_vanilla.forward_pass()
+    # time1 = tm.time()
+    # for i in range(100):
+    #     time2 = tm.time()
+    #     iLQR_vanilla.backward_pass()
+    #     time3 = tm.time()
+    #     (obj, isStop) = iLQR_vanilla.forward_pass()
+    #     time4 = tm.time()
+    #     print("Iteration No.%3d\t Backward Time:%.3e\t Forward Time:%.3e\t Obj. Value:%.8e\t"%(i,time3-time2,time4-time3,obj))
+    #     if isStop:
+    #         break
+    # time5 = tm.time()
+    # print("Completed! All Time:%.5e"%(time5-time1))
+    # io.savemat("test.mat",{"result": iLQR_vanilla.trajectory_list})  
 
 #%%

@@ -10,19 +10,50 @@ import numba
 import torch
 from torch import nn, optim
 from torch.autograd.functional import jacobian
+from torch.utils.tensorboard import SummaryWriter
 
 torch.manual_seed(42)
 device = "cuda:0"
 class DummyNetwork(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
-        n_hidden_1=800
-        n_hidden_2=400
-        self.layer = nn.Sequential( nn.Linear(in_dim, n_hidden_1), nn.BatchNorm1d(n_hidden_1), nn.ReLU(), 
-                                    nn.Linear(n_hidden_1, n_hidden_2),  nn.BatchNorm1d(n_hidden_2), nn.ReLU(),
-                                    nn.Linear(n_hidden_2, out_dim))
+        n_hidden_1=1024
+        n_hidden_2=1024
+        n_hidden_3=1024
+        n_hidden_4=512
+        n_hidden_5=512
+        n_hidden_6=512
+        n_hidden_7=256
+        n_hidden_8=256
+        n_hidden_9=256
+        n_hidden_7=128
+        n_hidden_8=128
+        n_hidden_9=128
+        n_hidden_10=64
+        n_hidden_11=64
+        n_hidden_12=64
+        self.layer1 = nn.Sequential( nn.Linear(in_dim, n_hidden_1), nn.BatchNorm1d(n_hidden_1), nn.ReLU(), 
+                                    nn.Linear(n_hidden_1, n_hidden_2), nn.BatchNorm1d(n_hidden_2), nn.ReLU(),
+                                    nn.Linear(n_hidden_2, n_hidden_3), nn.BatchNorm1d(n_hidden_3), nn.ReLU(),
+                                    nn.Linear(n_hidden_3, n_hidden_4))
+        self.shorcut1 = nn.Linear(in_dim, n_hidden_4)
+        self.layer2 = nn.Sequential( nn.Linear(n_hidden_4, n_hidden_5), nn.BatchNorm1d(n_hidden_5), nn.ReLU(), 
+                                    nn.Linear(n_hidden_5, n_hidden_6), nn.BatchNorm1d(n_hidden_6), nn.ReLU(),
+                                    nn.Linear(n_hidden_6, n_hidden_7))
+        self.shorcut2 = nn.Linear(n_hidden_4, n_hidden_7)
+        self.layer3 = nn.Sequential( nn.Linear(n_hidden_7, n_hidden_8), nn.BatchNorm1d(n_hidden_8), nn.ReLU(), 
+                                    nn.Linear(n_hidden_8, n_hidden_9), nn.BatchNorm1d(n_hidden_9), nn.ReLU(),
+                                    nn.Linear(n_hidden_9, n_hidden_10))
+        self.shorcut3 = nn.Linear(n_hidden_7, n_hidden_10)
+        self.layer4 = nn.Sequential( nn.Linear(n_hidden_10, n_hidden_11), nn.BatchNorm1d(n_hidden_11), nn.ReLU(), 
+                                    nn.Linear(n_hidden_11, n_hidden_12), nn.BatchNorm1d(n_hidden_12), nn.ReLU(),
+                                    nn.Linear(n_hidden_12, out_dim))
+        self.shorcut4 = nn.Linear(n_hidden_10, out_dim)
     def forward(self, x):
-        return self.layer(x)
+        out1 = self.layer1(x) + self.shorcut1(x)
+        out2 = self.layer2(out1) + self.shorcut2(out1)
+        out3 = self.layer3(out2) + self.shorcut3(out2)
+        return self.layer4(out3) + self.shorcut4(out3)
 
 class DynamicModelDataSetWrapper(object):
     def __init__(self, dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, additional_variables_all = None, dataset_size = 100):
@@ -59,20 +90,26 @@ class NeuralDynamicModelWrapper(object):
     def __init__(self, networks, lr = 0.01):
         self.model = networks
         self.model.cuda()
+        # self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.loss_fun = nn.MSELoss()
-
-    def train(self, dataset, max_epoch=10000):
+        self.writer = SummaryWriter()
+    def train(self, dataset_train, dataset_validation, max_epoch=10000):
         self.model.train()
-        X, Y = dataset.get_dataset()
+        X_train, Y_train = dataset_train.get_dataset()
         for epoch in range(max_epoch):
             self.optimizer.zero_grad()             
-            Y_prediction = self.model(X)         
-            cost = self.loss_fun(Y_prediction, Y) 
-            cost.backward()                   
-            self.optimizer.step()                  
-            print("[Epoch: {:>4}] cost = {:>.9}".format(epoch + 1, cost.item()))
-            if cost.item() < 1e-4:
+            Y_prediction = self.model(X_train)         
+            cost_train = self.loss_fun(Y_prediction, Y_train) 
+            cost_train.backward()                   
+            self.optimizer.step()
+
+            cost_vali = self.validate(dataset_validation)
+            print("[Epoch: %5d] \t Train Cost: %.5e \t Vali Cost:%.5e"%(
+                    epoch + 1,     cost_train.item(),  cost_vali.item()))
+            self.writer.add_scalar('Cost/train', cost_train.item(), epoch)
+            self.writer.add_scalar('Cost/Vali', cost_vali.item(), epoch)
+            if cost_vali.item() < 1e-5:
                 print(" [*] Training finished!")
                 return
         print(" [*] Training finished!")
@@ -82,10 +119,8 @@ class NeuralDynamicModelWrapper(object):
         X, Y = dataset.get_dataset()  
         with torch.no_grad():             # Zero Gradient Container
             Y_prediction = self.model(X)         # Forward Propagation
-            cost = self.loss_fun(Y_prediction, Y)
-
-            print('Accuracy of the network on test data: %f' % cost.item())
-            print(" [*] Testing finished!")
+            cost_vali = self.loss_fun(Y_prediction, Y)
+            return cost_vali
 
     def evaluate(self, data):
         return self.model(data)
