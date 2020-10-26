@@ -4,6 +4,7 @@ import sympy as sp
 import scipy as sci
 import time as tm
 from scipy import io
+import torch
 from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR
 
 if __name__ == "__main__":
@@ -32,7 +33,7 @@ if __name__ == "__main__":
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, dataset_size=100)
     dataset_train.update_train_set(dynamic_model.evaluate_trajectory())
     nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(DynamicModel.DummyNetwork(n_int+m_int, n_int))
-    nn_dynamic_model.train(dataset_train, batch_size=9900)
+    nn_dynamic_model.train(dataset_train)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, dataset_size=10) 
     nn_dynamic_model.validate(dataset_vali)
     print(  "################################\n"+

@@ -62,7 +62,7 @@ class NeuralDynamicModelWrapper(object):
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.loss_fun = nn.MSELoss()
 
-    def train(self, dataset,  batch_size = 100, max_epoch=10000):
+    def train(self, dataset, max_epoch=10000):
         self.model.train()
         X, Y = dataset.get_dataset()
         for epoch in range(max_epoch):
