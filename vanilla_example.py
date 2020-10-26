@@ -10,22 +10,31 @@ if __name__ == "__main__":
     #################################
     ##### Model of the vehicle ######
     #################################
-    vehicle, x_u, _, _ = DynamicModel.vehicle()
-    initial_states = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
-    dynamic_model = DynamicModel.dynamic_model_wrapper(vehicle, x_u, initial_states)
+    T_int = 100
+    initial_states = np.asarray([0,0,0,4],dtype=np.float64).reshape(-1,1)
+    vehicle, x_u, n_int, m_int = DynamicModel.vehicle()
+    dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, initial_states, np.zeros((T_int,m_int,1)), T_int)
     #################################
     ###### Weighting Matrices #######
     #################################
     C_matrix = np.diag([0.,1.,0.,1.,10.,10.])
     r_vector = np.asarray([0.,1.,0.,4.,0.,0.])
-    objective_function = ObjectiveFunction.objective_function_wrapper((x_u - r_vector)@C_matrix@(x_u - r_vector), x_u)
+    objective_function = ObjectiveFunction.ObjectiveFunctionWrapper((x_u - r_vector)@C_matrix@(x_u - r_vector), x_u)
     #################################
     ## Parameters of the vehicle ####
     #################################
-    T_int = 100
-
-    iLQR_vanilla = iLQR.iLQR_wrapper(dynamic_model, objective_function, T_int)
+    iLQR_vanilla = iLQR.iLQRWrapper(dynamic_model, objective_function)
     
+    x0_lower_bound = [-0, -1, -0.3, 0]
+    x0_upper_bound = [10, 1, 0.3, 8]
+    u0_lower_bound = [-0.3,-3]
+    u0_upper_bound = [0.3,3]
+    dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, dataset_size=100)
+    dataset_train.update_train_set(dynamic_model.evaluate_trajectory())
+    nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(DynamicModel.DummyNetwork(n_int+m_int, n_int))
+    nn_dynamic_model.train(dataset_train, batch_size=9900)
+    dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, dataset_size=10) 
+    nn_dynamic_model.validate(dataset_vali)
     print(  "################################\n"+
             "#######Starting Iteration#######\n"+
             "################################\n"+

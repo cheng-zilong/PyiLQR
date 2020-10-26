@@ -8,15 +8,26 @@ import cvxpy as cp
 from numba import njit, jitclass, jit
 import numba
 
-class iLQR_wrapper(object):
+class iLQRWrapper(object):
     """This is a wrapper class for the iLQR iteraton
     """
     def __init__(self,  dynamic_model_function, 
-                        objective_function, T_int, 
-                        initial_input_vector=None, 
+                        objective_function, 
                         additional_variables_for_dynamic_model=None, 
                         additional_variables_for_objective_function=None):
+        """ Initialization the iLQR solver class
 
+            Parameter
+            -----------
+            dynamic_model_function : DynamicModelWrapper
+                The dynamic model of the system
+            objective_function : ObjectiveFunctionWrapper
+                The objective function of the iLQR
+            additional_variables_for_dynamic_model : array(T_int, q_int)
+            additional_variables_for_objective_function : array(T_int, p_int)
+                The additional arguments for the lamdify function
+                q_int, p_int are the number of additional parameters
+        """
         # Initialize the functions
         self.dynamic_model_function = dynamic_model_function
         self.objective_function = objective_function
@@ -24,31 +35,14 @@ class iLQR_wrapper(object):
         # Parameters for the model
         self.n_int=self.dynamic_model_function.n_int
         self.m_int=self.dynamic_model_function.m_int
-        self.T_int=T_int
+        self.T_int=self.dynamic_model_function.T_int
         
-        # Dynamic matrix taylor expansion at a point
-        self.F_matrix_list = np.zeros((T_int, self.n_int, self.n_int+self.m_int))
-        self.trajectory_list = np.zeros((T_int, self.n_int+self.m_int, 1))
-        
-        # parameters for iLQR
-        self.K_matrix_list = np.zeros((T_int, self.m_int, self.n_int))
-        self.k_vector_list = np.zeros((T_int, self.m_int, 1))
+        # Additional parameters for iLQR
+        self.additional_variables_for_dynamic_model = additional_variables_for_dynamic_model
+        self.additional_variables_for_objective_function = additional_variables_for_objective_function
 
-        self.C_matrix_list = np.zeros((T_int, self.m_int+self.n_int, self.m_int+self.n_int))
-        self.c_vector_list = np.zeros((T_int, self.m_int+self.n_int, 1))
-        
-        if additional_variables_for_dynamic_model is None:
-            self.additional_variables_for_dynamic_model = np.zeros(T_int)
-        else:
-            self.additional_variables_for_dynamic_model = additional_variables_for_dynamic_model
-        if additional_variables_for_objective_function is None:
-            self.additional_variables_for_objective_function = np.zeros(T_int)
-        else:
-            self.additional_variables_for_objective_function = additional_variables_for_objective_function
-        if initial_input_vector is None:
-            initial_input_vector = np.zeros((T_int,self.m_int,1))
-        # Initialize the trajectory, F_matrix, C_matrix and c_vector
-        self.trajectory_list = self.dynamic_model_function.evaluate_trajectory(initial_input_vector, self.additional_variables_for_dynamic_model)
+        # Initialize the trajectory, F_matrix, objective_function_value_last, C_matrix and c_vector
+        self.trajectory_list = self.dynamic_model_function.evaluate_trajectory(additional_variables_all = self.additional_variables_for_dynamic_model)
         self.F_matrix_list = self.dynamic_model_function.evaluate_gradient_dynamic_model_function(self.trajectory_list, self.additional_variables_for_dynamic_model)
         self.objective_function_value_last = self.objective_function.evaluate_objective_function(self.trajectory_list, self.additional_variables_for_objective_function)
         self.c_vector_list = self.objective_function.evaluate_gradient_objective_function(self.trajectory_list, self.additional_variables_for_objective_function)
@@ -112,10 +106,10 @@ class iLQR_wrapper(object):
 
             Parameters
             ----------
-            delta_objective_function_value : float64
+            delta_objective_function_value : double
                 The delta_objective_function_value in the current iteration.
 
-            stopping_criterion : float64 
+            stopping_criterion : double 
                 The number of input variables
 
             Return
@@ -204,34 +198,9 @@ class iLQR_wrapper(object):
 ######## Log Barrier ########
 #############################
 
-class iLQR_log_barrier_class(iLQR_wrapper):
-    def __init__(self,  dynamic_model_function, 
-                        objective_function, T_int, 
-                        initial_input_vector=None, 
-                        additional_variables_for_dynamic_model=None, 
-                        additional_variables_for_objective_function=None):
-        """Initialization of the class 
-        
-            Parameters
-            ----------
-            dynamic_model_function : dynamic_model_wrapper 
-                The dynamic model of the system
-            objective_function : objective_function_wrapper
-                The objective function (may include the log barrier term)
-            initial_input_vector : array(T_int, m_int, 1) 
-                The initial input vector
-            additional_variables_for_dynamic_model : list(T_int, q_int)
-            additional_variables_for_objective_function : list(T_int, q_int)
-                The additional arguments for the lamdify function
-                q_int is the number of additional parameters
-        """
-        super().__init__(dynamic_model_function, objective_function, T_int, initial_input_vector, additional_variables_for_dynamic_model, additional_variables_for_objective_function)
-
+class iLQR_log_barrier_class(iLQRWrapper):
     def clear_objective_function_value_last(self):
         self.objective_function_value_last = np.inf
-
-    def forward_pass(self, gamma = 0.5, stopping_criterion = 1e-6, line_search_method = "feasibility", stopping_criterion_method = "vanilla"):
-        return super().forward_pass(gamma, stopping_criterion, line_search_method, stopping_criterion_method)
 
     def update_additional_variables_for_objective_function(self, additional_variables_for_objective_function):
         self.additional_variables_for_objective_function = additional_variables_for_objective_function
@@ -240,8 +209,9 @@ class iLQR_log_barrier_class(iLQR_wrapper):
 ######## Example ############
 ########## ADMM #############
 #############################
-
-class ADMM_iLQR_class(iLQR_wrapper):
+###### Not done yet #########
+#############################
+class ADMM_iLQR_class(iLQRWrapper):
     def __init__(self, x_u, dynamic_model, objective_function, n_int, m_int, T_int, initial_states, initial_input, initial_t):
         """Initialization of the class 
         

@@ -7,7 +7,7 @@ import cvxpy as cp
 from numba import njit, jitclass, jit
 import numba
 
-class objective_function_wrapper(object):
+class ObjectiveFunctionWrapper(object):
     """This is a wrapper class for the objective function
     """
     def __init__(self, objective_function, x_u_var, additional_var = None):
@@ -30,7 +30,7 @@ class objective_function_wrapper(object):
         # A stupid method to ensure each element in the hessian matrix is in the type of float64
         self.hessian_objective_function_lamdify = njit(sp.lambdify([x_u_var, additional_var], np.asarray(hessian_objective_function_array)+1e-100*np.eye(hessian_objective_function_array.shape[0]),"numpy"))
 
-    def evaluate_objective_function(self, trajectory_list, additional_variables_all):
+    def evaluate_objective_function(self, trajectory_list, additional_variables_all = None):
         """Return the objective function value
 
             Parameters
@@ -46,7 +46,7 @@ class objective_function_wrapper(object):
         """
         return self._evaluate_objective_function_static(self.objective_function_lamdify, trajectory_list, additional_variables_all)
 
-    def evaluate_gradient_objective_function(self, trajectory_list, additional_variables_all):
+    def evaluate_gradient_objective_function(self, trajectory_list, additional_variables_all = None):
         """Return the objective function value
 
             Parameters
@@ -62,7 +62,7 @@ class objective_function_wrapper(object):
         """
         return self._evaluate_gradient_objective_function_static(self.gradient_objective_function_lamdify, trajectory_list, additional_variables_all)
 
-    def evaluate_hessian_objective_function(self, trajectory_list, additional_variables_all):
+    def evaluate_hessian_objective_function(self, trajectory_list, additional_variables_all = None):
         """Return the objective function value
 
             Parameters
@@ -82,6 +82,8 @@ class objective_function_wrapper(object):
     @njit
     def _evaluate_objective_function_static(objective_function_lamdify, trajectory_list, additional_variables_all):
         T_int = int(trajectory_list.shape[0])
+        if additional_variables_all == None:
+            additional_variables_all = np.zeros((T_int,1))
         obj_value = 0
         for tau in range(T_int):
             obj_value = obj_value + np.asarray(objective_function_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64)
@@ -92,6 +94,8 @@ class objective_function_wrapper(object):
     def _evaluate_gradient_objective_function_static(gradient_objective_function_lamdify, trajectory_list, additional_variables_all):
         T_int = int(trajectory_list.shape[0])
         m_n_int = int(trajectory_list.shape[1])
+        if additional_variables_all == None:
+            additional_variables_all = np.zeros((T_int,1))
         grad_all_tau = np.zeros((T_int, m_n_int, 1))
         for tau in range(T_int):
             grad_all_tau[tau] = np.asarray(gradient_objective_function_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64).reshape(-1,1)
@@ -102,12 +106,14 @@ class objective_function_wrapper(object):
     def _evaluate_hessian_objective_function_static(hessian_objective_function_lamdify, trajectory_list, additional_variables_all):
         T_int = int(trajectory_list.shape[0])
         m_n_int = int(trajectory_list.shape[1])
+        if additional_variables_all == None:
+            additional_variables_all = np.zeros((T_int,1))
         hessian_all_tau = np.zeros((T_int, m_n_int, m_n_int))
         for tau in range(T_int):
             hessian_all_tau[tau] = np.asarray(hessian_objective_function_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64)
         return hessian_all_tau
 
-class objective_function_log_barrier_class(objective_function_wrapper):
+class objective_function_log_barrier_class(ObjectiveFunctionWrapper):
     def __init__(self, objective_function, x_u_var, inequality_constraints_list, variables_in_inequality_constraints_list = None):
         t_var = sp.symbols('t') # introduce the parameter for log barrier
         additional_variables_list = [] 

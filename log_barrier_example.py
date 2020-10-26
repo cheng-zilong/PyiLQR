@@ -11,9 +11,10 @@ if __name__ == "__main__":
     ##### Model of the vehicle ######
     #################################
     h_constant = 0.1 # step size
+    T_int = 60
     vehicle, x_u, n_int, m_int = DynamicModel.vehicle(h_constant)
     initial_states = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
-    dynamic_model = DynamicModel.dynamic_model_wrapper(vehicle, x_u, initial_states)
+    dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, initial_states, np.zeros((T_int,m_int,1)), T_int)
     #################################
     ## Constraints of the vehicle ###
     #################################
@@ -42,8 +43,6 @@ if __name__ == "__main__":
     #################################
     ############ Parameters #########
     #################################
-    # Parameters of the ego vehicle
-    T_int = 60
     # Parameters of the obstacle
     obs1_x0 = 20
     obs1_y0 = 0
@@ -71,7 +70,7 @@ if __name__ == "__main__":
                                                                     dtype = np.float64)
 
     iLQR_log_barrier = iLQR.iLQR_log_barrier_class(   dynamic_model, 
-                                                            objective_function,T_int,
+                                                            objective_function,
                                                             additional_variables_for_objective_function = additional_obj_parameters_matrix)
     print(  "################################\n"+
             "#######Starting Iteration#######\n"+
@@ -90,7 +89,7 @@ if __name__ == "__main__":
             time2 = tm.time()
             iLQR_log_barrier.backward_pass()
             time3 = tm.time()
-            (obj, is_stop) = iLQR_log_barrier.forward_pass()
+            (obj, is_stop) = iLQR_log_barrier.forward_pass(line_search_method = "feasibility")
             time4 = tm.time()
             print("%5d\t\t %.5e\t %.5e\t %.5e"%(i,time3-time2,time4-time3,obj))
             if is_stop:
