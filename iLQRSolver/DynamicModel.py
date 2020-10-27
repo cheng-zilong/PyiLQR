@@ -11,6 +11,7 @@ import torch
 from torch import nn, optim
 from torch.autograd.functional import jacobian
 from torch.utils.tensorboard import SummaryWriter
+import os
 
 torch.manual_seed(42)
 device = "cuda:0"
@@ -97,49 +98,7 @@ class DynamicModelDataSetWrapper(object):
     def get_dataset(self):
         return self.X, self. Y
 
-class NeuralDynamicModelWrapper(object):
-    def __init__(self, networks, lr = 0.01):
-        self.model = networks
-        self.model.cuda()
-        self.lr = lr
-        # self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
-        self.loss_fun = nn.MSELoss()
-        
-    def train(self, dataset_train, dataset_validation, max_epoch=10000, stopping_criterion = 1e-3):
-        self.writer = SummaryWriter()
-        self.model.train()
-        X_train, Y_train = dataset_train.get_dataset()
-        for epoch in range(max_epoch):
-            self.optimizer.zero_grad()             
-            Y_prediction = self.model(X_train)         
-            cost_train = self.loss_fun(Y_prediction, Y_train) 
-            cost_train.backward()                   
-            self.optimizer.step()
 
-            cost_vali = self.validate(dataset_validation)
-            print("[Epoch: %5d] \t Train Cost: %.5e \t Vali Cost:%.5e"%(
-                    epoch + 1,     cost_train.item(),  cost_vali.item()))
-            self.writer.add_scalar('Cost/train', cost_train.item(), epoch)
-            self.writer.add_scalar('Cost/Vali', cost_vali.item(), epoch)
-
-            if cost_vali.item() < stopping_criterion:
-                print(" [*] Training finished!")
-                return
-        print(" [*] Training finished!")
-
-    def validate(self, dataset):
-        self.model.eval()
-        X, Y = dataset.get_dataset()  
-        with torch.no_grad():             # Zero Gradient Container
-            Y_prediction = self.model(X)         # Forward Propagation
-            cost_vali = self.loss_fun(Y_prediction, Y)
-            return cost_vali
-
-    def evaluate(self, data):
-        return self.model(data)
-
-    
 class DynamicModelWrapper(object):
     """ This is a wrapper class for the dynamic model
     """
@@ -281,6 +240,97 @@ class DynamicModelWrapper(object):
         for tau in range(1, T_int):
             F_matrix_list[tau] = np.asarray(gradient_dynamic_model_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64)
         return F_matrix_list
+
+
+class NeuralDynamicModelWrapper(DynamicModelWrapper):
+    def __init__(self, networks, initial_states, n_int, m_int, T_int, lr = 0.01):
+        self.initial_states = initial_states
+        self.n_int = n_int
+        self.m_int = m_int
+        self.T_int = T_int
+        self.model = networks
+        self.lr = lr
+        # self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        self.loss_fun = nn.MSELoss()
+        
+    def train(self, dataset_train, dataset_validation, max_epoch=10000, stopping_criterion = 1e-3, model_name = "NeuralNetworks.model"):
+        if not os.path.exists(model_name):
+            print(" [+] Model File Does NOT Exist. Traning Start...")
+            self.writer = SummaryWriter()
+            self.model.cuda()
+            self.model.train()
+            X_train, Y_train = dataset_train.get_dataset()
+            for epoch in range(max_epoch):
+                self.optimizer.zero_grad()             
+                Y_prediction = self.model(X_train)         
+                cost_train = self.loss_fun(Y_prediction, Y_train) 
+                cost_train.backward()                   
+                self.optimizer.step()
+
+                cost_vali = self.validate(dataset_validation)
+                print("[Epoch: %5d] \t Train Obj: %.5e \t Vali Obj:%.5e"%(
+                        epoch + 1,     cost_train.item(),  cost_vali.item()))
+                self.writer.add_scalar('Obj/train', cost_train.item(), epoch)
+                self.writer.add_scalar('Obj/Vali', cost_vali.item(), epoch)
+                if cost_vali.item() < stopping_criterion:
+                    print(" [+] Training finished! Model File \"" + model_name + "\" Saved!")
+                    torch.save(self.model.state_dict(), model_name)
+                    self.model.cpu()
+                    return
+            raise Exception("Maximum Epoch!!!")
+        else:
+            print(" [+] Model File \"" + model_name + "\" Exists. Loading....")
+            self.model.load_state_dict(torch.load(model_name))
+            self.model.cpu()
+            self.model.eval()
+            print(" [+] Loading Completed!")
+
+    def validate(self, dataset):
+        self.model.eval()
+        X, Y = dataset.get_dataset()  
+        with torch.no_grad():             # Zero Gradient Container
+            Y_prediction = self.model(X)         # Forward Propagation
+            cost_vali = self.loss_fun(Y_prediction, Y)
+            return cost_vali
+
+    def next_state(self, current_state_and_input):
+        if isinstance(current_state_and_input, list):
+            current_state_and_input = np.asarray(current_state_and_input)
+        if current_state_and_input.shape[0] != 1:
+            current_state_and_input = current_state_and_input.reshape(1,-1)
+        x_u = torch.from_numpy(current_state_and_input).float()
+        return self.model(x_u).detach().numpy().reshape(-1,1)
+
+    def evaluate_trajectory(self, input_vector_all):
+        trajectory_list = np.zeros((self.T_int, self.n_int+self.m_int, 1))
+        trajectory_list[0] = np.vstack((self.initial_states, input_vector_all[0]))
+        for tau in range(self.T_int-1):
+            trajectory_list[tau+1, :self.n_int, 0] = self.model(torch.from_numpy(trajectory_list[tau,:].reshape(1,-1)).float()).detach().numpy()
+            trajectory_list[tau+1, self.n_int:] = input_vector_all[tau+1]
+        return trajectory_list
+
+    def update_trajectory(self, old_trajectory_list, K_matrix_all, k_vector_all, alpha): 
+        new_trajectory_list = np.zeros((self.T_int, self.m_int+self.n_int, 1))
+        new_trajectory_list[0] = old_trajectory_list[0] # initial states are the same
+        for tau in range(self.T_int-1):
+            # The amount of change of state x
+            delta_x = new_trajectory_list[tau, :self.n_int] - old_trajectory_list[tau, :self.n_int]
+            # The amount of change of input u
+            delta_u = K_matrix_all[tau]@delta_x+alpha*k_vector_all[tau]
+            # The real input of next iteration
+            input_u = old_trajectory_list[tau, self.n_int:self.n_int+self.m_int] + delta_u
+            new_trajectory_list[tau,self.n_int:] = input_u
+            new_trajectory_list[tau+1,0:self.n_int,0] = self.model(torch.from_numpy(new_trajectory_list[tau,:]).float()).detach().numpy()
+            # dont care the input at the last time stamp, because it is always zero
+        return new_trajectory_list
+
+    def evaluate_gradient_dynamic_model_function(self, trajectory_list):
+        F_matrix_list = np.zeros((self.T_int, self.n_int, self.n_int+self.m_int))
+        for tau in range(0, self.T_int):
+            F_matrix_list[tau] = jacobian(self.model, torch.from_numpy(trajectory_list[tau,:].reshape(1,-1)).float()).squeeze().numpy()
+        return F_matrix_list
+
 
 def vehicle(h_constant = 0.1):
     """Model of a vehicle

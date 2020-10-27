@@ -142,6 +142,11 @@ class iLQRWrapper(object):
                 The value of the objective function after the line search
             is_stop: Boolean
                 Whether the stopping criterion is reached. True: the stopping criterion is satisfied
+            C_matrix_list : array(T_int, n_int + m_int, n_int + m_int)
+
+            c_vector_list : array(T_int, n_int + m_int, n_int)
+
+            F_matrix_list : array(T_int, n_int, n_int  + m_int)
         """
         # Do line search
         if line_search_method == "vanilla":
@@ -160,13 +165,19 @@ class iLQRWrapper(object):
 
         # Finally update the objective_function_value_last
         self.objective_function_value_last = objective_function_value
-        return objective_function_value, is_stop
+        return objective_function_value, is_stop, self.C_matrix_list, self.c_vector_list, self.F_matrix_list
 
     def backward_pass(self):
         """Backward_pass in the iLQR algorithm
+
+            Return
+            ------------
+            K_matrix_list : array(T_int, m_int, n_int)
+            
+            k_vector_list : array(T_int, m_int, 1)
         """
         self.K_matrix_list, self.k_vector_list = self.backward_pass_static(self.m_int, self.n_int, self.T_int, self.C_matrix_list, self.c_vector_list, self.F_matrix_list)
-    
+        return self.K_matrix_list, self.k_vector_list
     @staticmethod
     @njit
     def backward_pass_static(m_int, n_int, T_int, C_matrix_list, c_vector_list, F_matrix_list):
