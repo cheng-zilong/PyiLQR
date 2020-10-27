@@ -35,7 +35,7 @@ class ObjectiveFunctionWrapper(object):
 
             Parameters
             -----------------
-            trajectory_list : array(T_int, m_int+n_int, 1) 
+            trajectory_list : array(T, m+n, 1) 
             additional_variables : tensor
                 For the purpose of new method design
 
@@ -51,13 +51,13 @@ class ObjectiveFunctionWrapper(object):
 
             Parameters
             -----------------
-            trajectory_list : array(T_int, m_int+n_int, 1) 
+            trajectory_list : array(T, m+n, 1) 
             additional_variables : tensor
                 For the purpose of new method design
 
             Return
             ---------------
-            grad : array[T_int, m_int+n_int,1] 
+            grad : array[T, m+n,1] 
                 The objective function jacobian
         """
         return self._evaluate_gradient_objective_function_static(self.gradient_objective_function_lamdify, trajectory_list, additional_variables_all)
@@ -67,13 +67,13 @@ class ObjectiveFunctionWrapper(object):
 
             Parameters
             -----------------
-            trajectory_list : array(T_int, m_int+n_int, 1) 
+            trajectory_list : array(T, m+n, 1) 
             additional_variables : tensor
                 For the purpose of new method design
 
             Return
             ---------------
-            grad : array[T_int, m_int+n_int, m_int+n_int] 
+            grad : array[T, m+n, m+n] 
                 The objective function hessian
         """
         return self._evaluate_hessian_objective_function_static(self.hessian_objective_function_lamdify, trajectory_list, additional_variables_all)
@@ -81,35 +81,35 @@ class ObjectiveFunctionWrapper(object):
     @staticmethod
     @njit
     def _evaluate_objective_function_static(objective_function_lamdify, trajectory_list, additional_variables_all):
-        T_int = int(trajectory_list.shape[0])
+        T = int(trajectory_list.shape[0])
         if additional_variables_all == None:
-            additional_variables_all = np.zeros((T_int,1))
+            additional_variables_all = np.zeros((T,1))
         obj_value = 0
-        for tau in range(T_int):
+        for tau in range(T):
             obj_value = obj_value + np.asarray(objective_function_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64)
         return obj_value
         
     @staticmethod
     @njit
     def _evaluate_gradient_objective_function_static(gradient_objective_function_lamdify, trajectory_list, additional_variables_all):
-        T_int = int(trajectory_list.shape[0])
-        m_n_int = int(trajectory_list.shape[1])
+        T = int(trajectory_list.shape[0])
+        m_n = int(trajectory_list.shape[1])
         if additional_variables_all == None:
-            additional_variables_all = np.zeros((T_int,1))
-        grad_all_tau = np.zeros((T_int, m_n_int, 1))
-        for tau in range(T_int):
+            additional_variables_all = np.zeros((T,1))
+        grad_all_tau = np.zeros((T, m_n, 1))
+        for tau in range(T):
             grad_all_tau[tau] = np.asarray(gradient_objective_function_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64).reshape(-1,1)
         return grad_all_tau
         
     @staticmethod
     @njit
     def _evaluate_hessian_objective_function_static(hessian_objective_function_lamdify, trajectory_list, additional_variables_all):
-        T_int = int(trajectory_list.shape[0])
-        m_n_int = int(trajectory_list.shape[1])
+        T = int(trajectory_list.shape[0])
+        m_n = int(trajectory_list.shape[1])
         if additional_variables_all == None:
-            additional_variables_all = np.zeros((T_int,1))
-        hessian_all_tau = np.zeros((T_int, m_n_int, m_n_int))
-        for tau in range(T_int):
+            additional_variables_all = np.zeros((T,1))
+        hessian_all_tau = np.zeros((T, m_n, m_n))
+        for tau in range(T):
             hessian_all_tau[tau] = np.asarray(hessian_objective_function_lamdify(trajectory_list[tau,:,0], additional_variables_all[tau]), dtype = np.float64)
         return hessian_all_tau
 

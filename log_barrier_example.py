@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     iLQR_log_barrier = iLQR.iLQR_log_barrier_class(   dynamic_model, 
                                                             objective_function,
-                                                            additional_variables_for_objective_function = additional_obj_parameters_matrix)
+                                                            additional_parameters_for_objective_function = additional_obj_parameters_matrix)
     print(  "################################\n"+
             "#######Starting Iteration#######\n"+
             "################################\n"+
@@ -84,12 +84,12 @@ if __name__ == "__main__":
     for j in [0.5, 1., 2., 5., 10., 20., 50., 100.]:
         for tau in range(T_int):
             additional_obj_parameters_matrix[tau,0] = j
-            iLQR_log_barrier.update_additional_variables_for_objective_function(additional_obj_parameters_matrix)
+            iLQR_log_barrier.update_additional_parameters_for_objective_function(additional_obj_parameters_matrix)
         for i in range(100):
             time2 = tm.time()
             iLQR_log_barrier.backward_pass()
             time3 = tm.time()
-            (obj, is_stop) = iLQR_log_barrier.forward_pass(line_search_method = "feasibility")
+            obj, is_stop, _, _, _ = iLQR_log_barrier.forward_pass(line_search_method = "feasibility")
             time4 = tm.time()
             print("%5d\t\t %.5e\t %.5e\t %.5e"%(i,time3-time2,time4-time3,obj))
             if is_stop:
@@ -99,6 +99,6 @@ if __name__ == "__main__":
                 break
     time5 = tm.time()
     print("Completed! All Time:%.5e"%(time5-time1))
-    io.savemat("test.mat",{"result": iLQR_log_barrier.trajectory_list})  
+    io.savemat("test.mat",{"result": iLQR_log_barrier.trajectory})  
 
 #%%
