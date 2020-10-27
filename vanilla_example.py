@@ -31,7 +31,7 @@ if __name__ == "__main__":
     u0_lower_bound = [-0.3,-3]
     u0_upper_bound = [0.3,3]
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, 
-                        dataset_size=100)
+                        dataset_size=1000)
     # dataset_train.update_train_set(dynamic_model.evaluate_trajectory())
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, 
                         dataset_size=10) 

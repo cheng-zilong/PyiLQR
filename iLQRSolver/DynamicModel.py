@@ -14,46 +14,56 @@ from torch.utils.tensorboard import SummaryWriter
 
 torch.manual_seed(42)
 device = "cuda:0"
+
+# class Residual(nn.Module):  #@save
+#     """The Residual block of ResNet."""
+#     def __init__(self, input_channels, output_channels):
+#         super().__init__()
+#         self.linear1 = nn.Linear(input_channels, input_channels)
+#         self.bn1 = nn.BatchNorm1d(input_channels)
+#         self.relu = nn.Sigmoid()
+#         self.linear2 = nn.Linear(input_channels, output_channels)
+#         self.bn2 = nn.BatchNorm1d(output_channels)
+
+#         self.shorcut = nn.Linear(input_channels, output_channels)
+#         self.main_track = nn.Sequential(self.linear1, self.bn1, self.relu, self.linear2, self.bn2)
+#     def forward(self, X):
+#         Y = self.main_track(X) + self.shorcut(X)
+#         return torch.nn.functional.sigmoid(Y)
+        
+# class DummyNetwork(nn.Module):
+#     def __init__(self, in_dim, out_dim):
+#         super().__init__()
+#         layer1_no=512
+#         layer2_no=256
+#         layer3_no=128
+
+#         self.layer0 = nn.BatchNorm1d(in_dim)
+#         self.layer1 = Residual(in_dim, layer1_no)
+#         self.layer2 = Residual(layer1_no, layer2_no)
+#         self.layer3 = Residual(layer2_no, layer3_no)
+#         self.layer6 = nn.Linear(layer3_no, out_dim)
+
+#     def forward(self, x):
+#         x = self.layer0(x)
+#         x = self.layer1(x)
+#         x = self.layer2(x)
+#         x = self.layer3(x)
+#         x = self.layer6(x)
+#         return x
+        
 class DummyNetwork(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
-        n_hidden_1=1024
-        n_hidden_2=1024
-        n_hidden_3=1024
-        n_hidden_4=512
-        n_hidden_5=512
-        n_hidden_6=512
-        n_hidden_7=256
-        n_hidden_8=256
-        n_hidden_9=256
-        n_hidden_7=128
-        n_hidden_8=128
-        n_hidden_9=128
-        n_hidden_10=64
-        n_hidden_11=64
-        n_hidden_12=64
-        self.layer1 = nn.Sequential( nn.Linear(in_dim, n_hidden_1), nn.BatchNorm1d(n_hidden_1), nn.ReLU(), 
-                                    nn.Linear(n_hidden_1, n_hidden_2), nn.BatchNorm1d(n_hidden_2), nn.ReLU(),
-                                    nn.Linear(n_hidden_2, n_hidden_3), nn.BatchNorm1d(n_hidden_3), nn.ReLU(),
-                                    nn.Linear(n_hidden_3, n_hidden_4))
-        self.shorcut1 = nn.Linear(in_dim, n_hidden_4)
-        self.layer2 = nn.Sequential( nn.Linear(n_hidden_4, n_hidden_5), nn.BatchNorm1d(n_hidden_5), nn.ReLU(), 
-                                    nn.Linear(n_hidden_5, n_hidden_6), nn.BatchNorm1d(n_hidden_6), nn.ReLU(),
-                                    nn.Linear(n_hidden_6, n_hidden_7))
-        self.shorcut2 = nn.Linear(n_hidden_4, n_hidden_7)
-        self.layer3 = nn.Sequential( nn.Linear(n_hidden_7, n_hidden_8), nn.BatchNorm1d(n_hidden_8), nn.ReLU(), 
-                                    nn.Linear(n_hidden_8, n_hidden_9), nn.BatchNorm1d(n_hidden_9), nn.ReLU(),
-                                    nn.Linear(n_hidden_9, n_hidden_10))
-        self.shorcut3 = nn.Linear(n_hidden_7, n_hidden_10)
-        self.layer4 = nn.Sequential( nn.Linear(n_hidden_10, n_hidden_11), nn.BatchNorm1d(n_hidden_11), nn.ReLU(), 
-                                    nn.Linear(n_hidden_11, n_hidden_12), nn.BatchNorm1d(n_hidden_12), nn.ReLU(),
-                                    nn.Linear(n_hidden_12, out_dim))
-        self.shorcut4 = nn.Linear(n_hidden_10, out_dim)
+        layer1_no=1000
+        layer2_no=1000
+        self.layer = nn.Sequential( nn.Linear(in_dim, layer1_no), nn.BatchNorm1d(layer1_no), nn.ReLU(), 
+                                    nn.Linear(layer1_no, layer2_no), nn.BatchNorm1d(layer2_no), nn.ReLU(), 
+                                    nn.Linear(layer2_no, out_dim))
+
     def forward(self, x):
-        out1 = self.layer1(x) + self.shorcut1(x)
-        out2 = self.layer2(out1) + self.shorcut2(out1)
-        out3 = self.layer3(out2) + self.shorcut3(out2)
-        return self.layer4(out3) + self.shorcut4(out3)
+        x = self.layer(x)
+        return x
 
 class DynamicModelDataSetWrapper(object):
     def __init__(self, dynamic_model, x0_lower_bound, x0_upper_bound, u0_lower_bound, u0_upper_bound, additional_variables_all = None, dataset_size = 100):
@@ -94,7 +104,7 @@ class NeuralDynamicModelWrapper(object):
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.loss_fun = nn.MSELoss()
         self.writer = SummaryWriter()
-    def train(self, dataset_train, dataset_validation, max_epoch=10000):
+    def train(self, dataset_train, dataset_validation, max_epoch=10000, stopping_criterion = 1e-3):
         self.model.train()
         X_train, Y_train = dataset_train.get_dataset()
         for epoch in range(max_epoch):
@@ -109,7 +119,7 @@ class NeuralDynamicModelWrapper(object):
                     epoch + 1,     cost_train.item(),  cost_vali.item()))
             self.writer.add_scalar('Cost/train', cost_train.item(), epoch)
             self.writer.add_scalar('Cost/Vali', cost_vali.item(), epoch)
-            if cost_vali.item() < 1e-5:
+            if cost_vali.item() < stopping_criterion:
                 print(" [*] Training finished!")
                 return
         print(" [*] Training finished!")
@@ -297,4 +307,8 @@ def vehicle(h_constant = 0.1):
                 x_u[3]+h_constant*x_u[5]
             ])
     return system, x_u, 4, 2
+
+def cart_pole(h_constant = 0.02):
+    x_u = sp.symbols('x_u:5') # x0: theta x1:dot_theta x2:x x3 dot_x x4:F
+
 # %%
