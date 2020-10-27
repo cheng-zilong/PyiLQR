@@ -55,9 +55,10 @@ device = "cuda:0"
 class DummyNetwork(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
-        layer1_no=1000
-        layer2_no=1000
-        self.layer = nn.Sequential( nn.Linear(in_dim, layer1_no), nn.BatchNorm1d(layer1_no), nn.ReLU(), 
+        layer1_no=800
+        layer2_no=400
+        self.layer = nn.Sequential( nn.BatchNorm1d(in_dim), 
+                                    nn.Linear(in_dim, layer1_no), nn.BatchNorm1d(layer1_no), nn.ReLU(), 
                                     nn.Linear(layer1_no, layer2_no), nn.BatchNorm1d(layer2_no), nn.ReLU(), 
                                     nn.Linear(layer2_no, out_dim))
 
@@ -100,11 +101,13 @@ class NeuralDynamicModelWrapper(object):
     def __init__(self, networks, lr = 0.01):
         self.model = networks
         self.model.cuda()
+        self.lr = lr
         # self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.loss_fun = nn.MSELoss()
-        self.writer = SummaryWriter()
+        
     def train(self, dataset_train, dataset_validation, max_epoch=10000, stopping_criterion = 1e-3):
+        self.writer = SummaryWriter()
         self.model.train()
         X_train, Y_train = dataset_train.get_dataset()
         for epoch in range(max_epoch):
@@ -119,6 +122,7 @@ class NeuralDynamicModelWrapper(object):
                     epoch + 1,     cost_train.item(),  cost_vali.item()))
             self.writer.add_scalar('Cost/train', cost_train.item(), epoch)
             self.writer.add_scalar('Cost/Vali', cost_vali.item(), epoch)
+
             if cost_vali.item() < stopping_criterion:
                 print(" [*] Training finished!")
                 return
@@ -135,6 +139,7 @@ class NeuralDynamicModelWrapper(object):
     def evaluate(self, data):
         return self.model(data)
 
+    
 class DynamicModelWrapper(object):
     """ This is a wrapper class for the dynamic model
     """
