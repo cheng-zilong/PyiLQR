@@ -47,7 +47,9 @@ class iLQRWrapper(object):
         self.objective_function_value_last = self.objective_function.evaluate_objective_function(self.trajectory, self.additional_parameters_for_objective_function)
         self.c_vector_list = self.objective_function.evaluate_gradient_objective_function(self.trajectory, self.additional_parameters_for_objective_function)
         self.C_matrix_list = self.objective_function.evaluate_hessian_objective_function(self.trajectory, self.additional_parameters_for_objective_function)
-        
+    def update_F_matrix(self, F_matrix):
+        self.F_matrix_list = F_matrix
+
     def vanilla_line_search(self,  gamma):
         """To ensure the value of the objective function is reduced monotonically
 
@@ -165,7 +167,7 @@ class iLQRWrapper(object):
 
         # Finally update the objective_function_value_last
         self.objective_function_value_last = objective_function_value
-        return objective_function_value, is_stop, self.C_matrix_list, self.c_vector_list, self.F_matrix_list
+        return objective_function_value, is_stop, self.C_matrix_list, self.c_vector_list, self.trajectory
 
     def backward_pass(self):
         """Backward_pass in the iLQR algorithm

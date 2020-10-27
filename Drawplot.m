@@ -1,5 +1,4 @@
 %% For y
-load('test.mat')
 fig=figure(1);
 t = linspace(0,2*pi) ;
 a = 5 ; b = 2 ;

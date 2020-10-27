@@ -208,12 +208,12 @@ class DynamicModelWrapper(object):
         T = int(input_trajectory.shape[0])
         if additional_parameters == None:
             additional_parameters = np.zeros((T,1))
-        trajectory_list = np.zeros((T, m+n, 1))
-        trajectory_list[0] = np.vstack((initial_states, input_trajectory[0]))
+        trajectory = np.zeros((T, m+n, 1))
+        trajectory[0] = np.vstack((initial_states, input_trajectory[0]))
         for tau in range(T-1):
-            trajectory_list[tau+1, :n, 0] = np.asarray(dynamic_model_lamdify(trajectory_list[tau,:,0], additional_parameters[tau]),dtype=np.float64)
-            trajectory_list[tau+1, n:] = input_trajectory[tau+1]
-        return trajectory_list
+            trajectory[tau+1, :n, 0] = np.asarray(dynamic_model_lamdify(trajectory[tau,:,0], additional_parameters[tau]),dtype=np.float64)
+            trajectory[tau+1, n:] = input_trajectory[tau+1]
+        return trajectory
 
     @staticmethod
     @njit
@@ -237,15 +237,15 @@ class DynamicModelWrapper(object):
 
     @staticmethod
     @njit
-    def _evaluate_gradient_dynamic_model_function_static(gradient_dynamic_model_lamdify, trajectory_list, additional_parameters):
-        T = int(trajectory_list.shape[0])
+    def _evaluate_gradient_dynamic_model_function_static(gradient_dynamic_model_lamdify, trajectory, additional_parameters):
+        T = int(trajectory.shape[0])
         if additional_parameters == None:
             additional_parameters = np.zeros((T,1))
-        F_matrix_initial =  gradient_dynamic_model_lamdify(trajectory_list[0,:,0], additional_parameters[0])
+        F_matrix_initial =  gradient_dynamic_model_lamdify(trajectory[0,:,0], additional_parameters[0])
         F_matrix_list = np.zeros((T, len(F_matrix_initial), len(F_matrix_initial[0])))
         F_matrix_list[0] = np.asarray(F_matrix_initial, dtype = np.float64)
         for tau in range(1, T):
-            F_matrix_list[tau] = np.asarray(gradient_dynamic_model_lamdify(trajectory_list[tau,:,0], additional_parameters[tau]), dtype = np.float64)
+            F_matrix_list[tau] = np.asarray(gradient_dynamic_model_lamdify(trajectory[tau,:,0], additional_parameters[tau]), dtype = np.float64)
         return F_matrix_list
 
 
@@ -316,32 +316,32 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
         if input_trajectory is None:
             input_trajectory = self.initial_input_trajectory
 
-        trajectory_list = np.zeros((self.T, self.n+self.m, 1))
-        trajectory_list[0] = np.vstack((initial_states, input_trajectory[0]))
+        trajectory = np.zeros((self.T, self.n+self.m, 1))
+        trajectory[0] = np.vstack((initial_states, input_trajectory[0]))
         for tau in range(self.T-1):
-            trajectory_list[tau+1, :self.n, 0] = self.model(torch.from_numpy(trajectory_list[tau,:].reshape(1,-1)).float()).detach().numpy()
-            trajectory_list[tau+1, self.n:] = input_trajectory[tau+1]
-        return trajectory_list
+            trajectory[tau+1, :self.n, 0] = self.model(torch.from_numpy(trajectory[tau,:].reshape(1,-1)).float()).detach().numpy()
+            trajectory[tau+1, self.n:] = input_trajectory[tau+1]
+        return trajectory
 
-    def update_trajectory(self, old_trajectory_list, K_matrix_all, k_vector_all, alpha, additional_parameters=None): 
-        new_trajectory_list = np.zeros((self.T, self.m+self.n, 1))
-        new_trajectory_list[0] = old_trajectory_list[0] # initial states are the same
+    def update_trajectory(self, old_trajectory, K_matrix_all, k_vector_all, alpha, additional_parameters=None): 
+        new_trajectory = np.zeros((self.T, self.m+self.n, 1))
+        new_trajectory[0] = old_trajectory[0] # initial states are the same
         for tau in range(self.T-1):
             # The amount of change of state x
-            delta_x = new_trajectory_list[tau, :self.n] - old_trajectory_list[tau, :self.n]
+            delta_x = new_trajectory[tau, :self.n] - old_trajectory[tau, :self.n]
             # The amount of change of input u
             delta_u = K_matrix_all[tau]@delta_x+alpha*k_vector_all[tau]
             # The real input of next iteration
-            input_u = old_trajectory_list[tau, self.n:self.n+self.m] + delta_u
-            new_trajectory_list[tau,self.n:] = input_u
-            new_trajectory_list[tau+1,0:self.n,0] = self.model(torch.from_numpy(new_trajectory_list[tau,:]).float()).detach().numpy()
+            input_u = old_trajectory[tau, self.n:self.n+self.m] + delta_u
+            new_trajectory[tau,self.n:] = input_u
+            new_trajectory[tau+1,0:self.n,0] = self.model(torch.from_numpy(new_trajectory[tau,:]).float()).detach().numpy()
             # dont care the input at the last time stamp, because it is always zero
-        return new_trajectory_list
+        return new_trajectory
 
-    def evaluate_gradient_dynamic_model_function(self, trajectory_list, additional_parameters=None):
+    def evaluate_gradient_dynamic_model_function(self, trajectory, additional_parameters=None):
         F_matrix_list = np.zeros((self.T, self.n, self.n+self.m))
         for tau in range(0, self.T):
-            F_matrix_list[tau] = jacobian(self.model, torch.from_numpy(trajectory_list[tau,:].reshape(1,-1)).float()).squeeze().numpy()
+            F_matrix_list[tau] = jacobian(self.model, torch.from_numpy(trajectory[tau,:].reshape(1,-1)).float()).squeeze().numpy()
         return F_matrix_list
 
 
