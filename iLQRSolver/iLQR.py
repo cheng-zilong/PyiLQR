@@ -23,10 +23,10 @@ class iLQRWrapper(object):
                 The dynamic model of the system
             objective_function : ObjectiveFunctionWrapper
                 The objective function of the iLQR
-            additional_parameters_for_dynamic_model : array(T, q_int)
-            additional_parameters_for_objective_function : array(T, p_int)
+            additional_parameters_for_dynamic_model : array(T, q)
+            additional_parameters_for_objective_function : array(T, p)
                 The additional arguments for the lamdify function
-                q_int, p_int are the number of additional parameters
+                q, p are the number of additional parameters
         """
         # Initialize the functions
         self.dynamic_model_function = dynamic_model_function
@@ -68,7 +68,7 @@ class iLQRWrapper(object):
         # alpha: Step size
         alpha = 1.
         current_trajectory = np.zeros((self.T, self.n+self.m, 1))
-        while(True): # Line Search if the z value is greater than zero
+        for _ in range(100): # Line Search if the z value is greater than zero
             current_trajectory = self.dynamic_model_function.update_trajectory(self.trajectory, self.K_matrix_list, self.k_vector_list, alpha, self.additional_parameters_for_dynamic_model)
             current_objective_function_value = self.objective_function.evaluate_objective_function(current_trajectory, self.additional_parameters_for_objective_function)
             delta_objective_function_value = current_objective_function_value-self.objective_function_value_last
@@ -94,7 +94,7 @@ class iLQRWrapper(object):
         """
         alpha = 1.
         current_trajectory = np.zeros((self.T, self.n+self.m, 1))
-        while(True): # Line Search if the z value is greater than zero
+        for _ in range(100): # Line Search if the z value is greater than zero
             current_trajectory = self.dynamic_model_function.update_trajectory(self.trajectory, self.K_matrix_list, self.k_vector_list, alpha, self.additional_parameters_for_dynamic_model)
             current_objective_function_value = self.objective_function.evaluate_objective_function(current_trajectory, self.additional_parameters_for_objective_function)
             delta_objective_function_value = current_objective_function_value-self.objective_function_value_last
