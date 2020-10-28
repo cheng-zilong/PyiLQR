@@ -327,7 +327,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
         """
         print("###### Pre-training ######")
         # if the model exists, load the model directly
-        if not os.path.exists(model_name):
+        if not os.path.exists("Models\\"+model_name):
             print(" [+] Model file does NOT exist. Pre-traning starts...")
             self.writer = SummaryWriter()
             loss_fun = nn.MSELoss()
@@ -362,13 +362,13 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                     self.writer.add_scalar('Obj/Vali', obj_vali.item(), epoch)
                     if obj_train.item() < stopping_criterion:
                         print(" [+] Pre-training finished! Model file \"" + model_name + "\" is saved!")
-                        torch.save(self.model.state_dict(), model_name)
+                        torch.save(self.model.state_dict(), "Models\\"+model_name)
                         self.model.eval()
                         return
             raise Exception("Maximum epoch is reached!")
         else:
             print(" [+] Model file \"" + model_name + "\" exists. Loading....")
-            self.model.load_state_dict(torch.load(model_name))
+            self.model.load_state_dict(torch.load("Models\\"+model_name))
             print(" [+] Loading Completed!")
             self.model.eval()
 
