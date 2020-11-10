@@ -11,25 +11,10 @@ from loguru import logger
 from scipy.ndimage import gaussian_filter1d
 import atexit 
 
-def loguru_start(example_name="N.A.", 
-                T = "N.A.",
-                trial_no = "N.A.",
-                max_iter="N.A.", 
-                is_re_train="N.A.", 
-                stopping_criterion="N.A.", 
-                is_check_stop="N.A.", 
-                decay_rate="N.A.", 
-                decay_rate_max_iters="N.A."):
-    logger_id = logger.add("log\\" + example_name + ".log", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
-    logger.debug("[+] Starting Iteration: " + example_name)
-    logger.debug("[+] prediction_horizon: " + str(T))
-    logger.debug("[+] max_iter: " + str(max_iter))
-    logger.debug("[+] trial_no: " + str(trial_no))
-    logger.debug("[+] is_re_train: " + str(is_re_train))
-    logger.debug("[+] stopping_criterion: " + str(stopping_criterion))
-    logger.debug("[+] is_check_stop: " + str(is_check_stop))
-    logger.debug("[+] decay_rate: " + str(decay_rate))
-    logger.debug("[+] decay_rate_max_iters: " + str(decay_rate_max_iters))
+def loguru_start(**args):
+    logger_id = logger.add("log\\" + args["file_name"] + ".log", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
+    for arg in args:
+        logger.debug("[+] " + arg + ": " +  str(args[arg]))
     return logger_id
     
 def loguru_end(logger_id):
@@ -149,7 +134,7 @@ class iLQRExample(object):
                 start_time = tm.time()
             iter_start_time = tm.time()
             F_matrix = nn_dynamic_model.eval_grad_dynamic_model(trajectory)
-            F_matrix = gaussian_filter1d(F_matrix, 1, axis=0)
+            F_matrix = gaussian_filter1d(F_matrix, sigma = 10, axis=0)
             self.real_system_iLQR.update_F_matrix(F_matrix)
             self.real_system_iLQR.backward_pass()
             obj_val, isStop = self.real_system_iLQR.forward_pass()
@@ -166,18 +151,15 @@ class iLQRExample(object):
                 if len(new_data) != 0: # Ensure the optimal trajectroy being in the dataset
                     trajectory_noisy = trajectory
                 else:
-                    trajectory_noisy = self.dynamic_model.eval_traj(input_traj = (trajectory[:,self.dynamic_model.n:]+np.random.normal(0,1,[self.dynamic_model.m,1])))
+                    trajectory_noisy = self.dynamic_model.eval_traj(input_traj = (trajectory[:,self.dynamic_model.n:]+np.random.normal(0,1,[self.dynamic_model.T,self.dynamic_model.m,1])))
                 new_data += [trajectory_noisy]
                 dataset_train.update_dataset(new_data[-int(self.dynamic_model.T/5):])
                 io.savemat("mat\\" + example_name + "\\" + str(i) +".mat",{"optimal_trajectory": self.real_system_iLQR.get_traj(), "trajectroy_noisy": trajectory_noisy})
                 nn_dynamic_model.re_train(dataset_train, max_epoch = 100000, stopping_criterion = re_train_stopping_criterion)
                 new_data = []
-                
         end_time = tm.time()
         logger.debug("[+ +] Completed! All Time:%.5e"%(end_time-start_time))
         
-
-
     def net_iLQR(self, example_name, nn_dynamic_model, dataset_train, is_re_train = True, re_train_stopping_criterion = 1e-5, max_iter = 100, is_check_stop = True, decay_rate = 1, decay_rate_max_iters = 300):
         """ Solve the problem with nerual network iLQR
 

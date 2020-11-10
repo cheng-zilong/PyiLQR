@@ -47,7 +47,7 @@ class LargeNetwork(nn.Module):
 
 def cartpole1_vanilla(T = 300, max_iter = 10000, is_check_stop = True):
     file_name = "cartpole1_vanilla_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, max_iter = max_iter, is_check_stop = is_check_stop)
+    logger_id = iLQRExample.loguru_start(file_name = file_name, T=T, max_iter = max_iter, is_check_stop = is_check_stop)
     #################################
     ######### Dynamic Model #########
     #################################
@@ -80,7 +80,7 @@ def cartpole1_dd_iLQR(   T = 300,
                         decay_rate=0.99,
                         decay_rate_max_iters=300):
     file_name = "cartpole1_dd_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, trial_no = trial_no,  stopping_criterion = stopping_criterion,  max_iter = max_iter, decay_rate = decay_rate, decay_rate_max_iters = decay_rate_max_iters)
+    logger_id = iLQRExample.loguru_start(file_name = file_name, T=T, trial_no = trial_no,  stopping_criterion = stopping_criterion,  max_iter = max_iter, decay_rate = decay_rate, decay_rate_max_iters = decay_rate_max_iters)
     #################################
     ######### Dynamic Model #########
     #################################
@@ -131,7 +131,7 @@ def cartpole1_net_iLQR( T = 300,
                         decay_rate=0.99,
                         decay_rate_max_iters=300):
     file_name = "cartpole1_net_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, trial_no = trial_no, is_check_stop = is_check_stop, stopping_criterion = stopping_criterion, is_re_train = is_re_train, max_iter = max_iter, decay_rate = decay_rate, decay_rate_max_iters = decay_rate_max_iters)
+    logger_id = iLQRExample.loguru_start(file_name = file_name, T=T, trial_no = trial_no, is_check_stop = is_check_stop, stopping_criterion = stopping_criterion, is_re_train = is_re_train, max_iter = max_iter, decay_rate = decay_rate, decay_rate_max_iters = decay_rate_max_iters)
      #################################
     ######### Dynamic Model #########
     #################################
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     # cartpole1_vanilla(T = 150, max_iter=10000, is_check_stop = True)
 
     cartpole1_dd_iLQR(  T = 150,
-                        trial_no=1000,
+                        trial_no=100,
                         stopping_criterion = 1e-4,
                         max_iter=1000,
                         decay_rate=0.98,
