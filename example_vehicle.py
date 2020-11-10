@@ -45,7 +45,6 @@ class LargeNetwork(nn.Module):
 
 def vehicle_vanilla(T = 100, max_iter = 10000, is_check_stop = True):
     file_name = "vehicle_vanilla_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, max_iter = max_iter, is_check_stop = is_check_stop)
     #################################
     ######### Dynamic Model #########
     #################################
@@ -62,6 +61,13 @@ def vehicle_vanilla(T = 100, max_iter = 10000, is_check_stop = True):
     #################################
     ######### iLQR Solver ###########
     #################################
+    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+                                            T=T, 
+                                            max_iter = max_iter, 
+                                            is_check_stop = is_check_stop,
+                                            init_state = init_state,
+                                            C_matrix = C_matrix,
+                                            r_vector = r_vector)
     vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
     vehicle_example.vanilla_iLQR(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
     iLQRExample.loguru_end(logger_id)
@@ -128,9 +134,11 @@ def vehicle_dd_iLQR(T = 100,
                     stopping_criterion = 1e-4, 
                     max_iter=100, 
                     decay_rate=0.99, 
-                    decay_rate_max_iters=300):
+                    decay_rate_max_iters=300,
+                    gaussian_filter_sigma = 10,
+                    gaussian_noise_sigma = [[0.01], [0.1]],
+                    is_use_large_net = False):
     file_name = "vehicle_dd_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, trial_no = trial_no, stopping_criterion = stopping_criterion, max_iter = max_iter, decay_rate = decay_rate, decay_rate_max_iters = decay_rate_max_iters)
     #################################
     ######### Dynamic Model #########
     #################################
@@ -152,31 +160,51 @@ def vehicle_dd_iLQR(T = 100,
     x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=trial_no)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    # nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
-    # nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small.model")
-    nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
-    nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_large.model")
+    if is_use_large_net:
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_large.model")
+    else:
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small.model")
+
     #################################
     ######### iLQR Solver ###########
     #################################
+    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+                                            T=T, 
+                                            trial_no = trial_no, 
+                                            stopping_criterion = stopping_criterion, 
+                                            max_iter = max_iter, 
+                                            decay_rate = decay_rate, 
+                                            decay_rate_max_iters = decay_rate_max_iters, 
+                                            gaussian_filter_sigma = gaussian_filter_sigma, 
+                                            gaussian_noise_sigma = gaussian_noise_sigma,
+                                            init_state = init_state,
+                                            C_matrix = C_matrix,
+                                            r_vector = r_vector,
+                                            x0_u_lower_bound = x0_u_lower_bound,
+                                            x0_u_upper_bound = x0_u_upper_bound,
+                                            is_use_large_net = is_use_large_net)
     vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
     vehicle_example.dd_iLQR(        file_name, nn_dynamic_model, dataset_train, 
                                     re_train_stopping_criterion=stopping_criterion, 
                                     max_iter=max_iter,
                                     decay_rate=decay_rate,
-                                    decay_rate_max_iters=decay_rate_max_iters)
+                                    decay_rate_max_iters=decay_rate_max_iters,
+                                    gaussian_filter_sigma = gaussian_filter_sigma,
+                                    gaussian_noise_sigma = gaussian_noise_sigma)
     iLQRExample.loguru_end(logger_id)
 
 def vehicle_net_iLQR(   T = 100, 
                         trial_no=100,
-                        is_check_stop = True, 
                         stopping_criterion = 1e-4,
-                        is_re_train = True,  
                         max_iter=100,
                         decay_rate=0.99,
-                        decay_rate_max_iters=300):
+                        decay_rate_max_iters=300,
+                        gaussian_filter_sigma = 10,
+                        gaussian_noise_sigma = [[0.01], [0.1]],
+                        is_use_large_net = False):
     file_name = "vehicle_net_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, trial_no = trial_no, is_check_stop = is_check_stop, stopping_criterion = stopping_criterion, is_re_train = is_re_train, max_iter = max_iter, decay_rate = decay_rate, decay_rate_max_iters = decay_rate_max_iters)
     #################################
     ######### Dynamic Model #########
     #################################
@@ -198,21 +226,39 @@ def vehicle_net_iLQR(   T = 100,
     x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=trial_no)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
-    nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small.model")
-    # nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
-    # nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_large.model")
+    if is_use_large_net:
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_large.model")
+    else:
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small.model")
+
     #################################
     ######### iLQR Solver ###########
     #################################
+    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+                                            T=T, 
+                                            trial_no = trial_no, 
+                                            stopping_criterion = stopping_criterion, 
+                                            max_iter = max_iter, 
+                                            decay_rate = decay_rate, 
+                                            decay_rate_max_iters = decay_rate_max_iters, 
+                                            gaussian_filter_sigma = gaussian_filter_sigma, 
+                                            gaussian_noise_sigma = gaussian_noise_sigma,
+                                            init_state = init_state,
+                                            C_matrix = C_matrix,
+                                            r_vector = r_vector,
+                                            x0_u_lower_bound = x0_u_lower_bound,
+                                            x0_u_upper_bound = x0_u_upper_bound,
+                                            is_use_large_net = is_use_large_net)
     vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-    vehicle_example.net_iLQR(file_name, nn_dynamic_model, dataset_train, 
-                                    is_re_train = is_re_train, 
+    vehicle_example.net_iLQR(        file_name, nn_dynamic_model, dataset_train, 
                                     re_train_stopping_criterion=stopping_criterion, 
                                     max_iter=max_iter,
-                                    is_check_stop=is_check_stop,
                                     decay_rate=decay_rate,
-                                    decay_rate_max_iters=decay_rate_max_iters)
+                                    decay_rate_max_iters=decay_rate_max_iters,
+                                    gaussian_filter_sigma = gaussian_filter_sigma,
+                                    gaussian_noise_sigma = gaussian_noise_sigma)
     iLQRExample.loguru_end(logger_id)
 
 # Vehicle Neural Gradient
@@ -265,21 +311,25 @@ if __name__ == "__main__":
 
     # vehicle_log_barrier(T = 100, max_iter=10000, is_check_stop = True)
 
-    vehicle_dd_iLQR( T = 100,
-                    trial_no=100,
-                    stopping_criterion = 1e-4,
-                    max_iter=1000,
-                    decay_rate=0.99,
-                    decay_rate_max_iters=300)
+    # vehicle_dd_iLQR(    T = 100,
+    #                     trial_no=100,
+    #                     stopping_criterion = 1e-4,
+    #                     max_iter=1000,
+    #                     decay_rate=0.99,
+    #                     decay_rate_max_iters=300,
+    #                     gaussian_filter_sigma = 5,
+    #                     gaussian_noise_sigma = [[0.01], [0.1]],
+    #                     is_use_large_net = False)
 
-    # vehicle_net_iLQR(T = 100,
-    #                 trial_no=300,
-    #                 is_check_stop = False, 
-    #                 stopping_criterion = 1e-4,
-    #                 is_re_train = True, 
-    #                 max_iter=1000,
-    #                 decay_rate=0.995,        
-    #                 decay_rate_max_iters=300)
+    vehicle_net_iLQR(   T = 100,
+                        trial_no=100,
+                        stopping_criterion = 1e-4,
+                        max_iter=1000,
+                        decay_rate=0.99,
+                        decay_rate_max_iters=300,
+                        gaussian_filter_sigma = 5,
+                        gaussian_noise_sigma = [[0.01], [0.1]],
+                        is_use_large_net = False)
 
     # vehicle_neural_gradient(T = 100,
     #                         is_check_stop = False, 
