@@ -284,12 +284,4 @@ if __name__ == "__main__":
     #                     gaussian_filter_sigma = 10,
     #                     gaussian_noise_sigma = 1,
     #                     is_use_large_net = True)
-
-    # cartpole1_neural_gradient(  T = 300,
-    #                             is_check_stop = False, 
-    #                             stopping_criterion = 1e-5,
-    #                             is_re_train = True, 
-    #                             max_iter=3000,
-    #                             decay_rate=0.995,
-    #                             decay_rate_max_iters=200)
 # %%

@@ -304,51 +304,6 @@ def vehicle_net_iLQR(   T = 100,
                                     gaussian_filter_sigma = gaussian_filter_sigma,
                                     gaussian_noise_sigma = gaussian_noise_sigma)
     iLQRExample.loguru_end(logger_id)
-
-# Vehicle Neural Gradient
-def vehicle_neural_gradient(    T = 100,
-                                is_check_stop = False, 
-                                stopping_criterion = 1e-5,
-                                is_re_train = True, 
-                                max_iter=100,
-                                decay_rate=0.99,
-                                decay_rate_max_iters=300):
-    file_name = "vehicle_neural_gradient_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    #################################
-    ######### Dynamic Model #########
-    #################################
-    T = 100
-    vehicle, x_u, n, m = DynamicModel.vehicle()
-    init_state = np.asarray([0,0,0,4],dtype=np.float64).reshape(-1,1)
-    init_input = np.zeros((T,m,1))
-    dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, init_state, init_input, T)
-    #################################
-    ##### Objective Function ########
-    #################################
-    C_matrix = np.diag([0.,1.,0.,1.,10.,10.])
-    r_vector = np.asarray([0.,-3.,0.,8.,0.,0.])
-    objective_function = ObjectiveFunction.ObjectiveFunctionWrapper((x_u - r_vector)@C_matrix@(x_u - r_vector), x_u)
-    #################################
-    ########## Training #############
-    #################################
-    x0_u_lower_bound = [-0, -1, -0.3, 0, -0.3, -3]
-    x0_u_upper_bound = [10,  1,  0.3, 8,  0.3,  3]
-    x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
-    dataset_train = DynamicModel.DynamicModelGradientDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=100)
-    dataset_vali = DynamicModel.DynamicModelGradientDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    nn_dynamic_model = DynamicModel.NeuralGradientDynamicModelWrapper(SmallNetwork(n+m, n*(n+m)),init_state,init_input,T)
-    nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "vehicle_neural_gradient.model")
-    #################################
-    ######### iLQR Solver ###########
-    #################################
-    vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-    vehicle_example.dd_iLQR(file_name, nn_dynamic_model, dataset_train, 
-                                    is_re_train = is_re_train, 
-                                    re_train_stopping_criterion=stopping_criterion, 
-                                    max_iter=max_iter,
-                                    is_check_stop=is_check_stop,
-                                    decay_rate=decay_rate,
-                                    decay_rate_max_iters=decay_rate_max_iters)
 # %%
 if __name__ == "__main__":
     # vehicle_vanilla(T = 100, max_iter=10000, is_check_stop = True)
@@ -374,12 +329,4 @@ if __name__ == "__main__":
     #                     gaussian_filter_sigma = 5,
     #                     gaussian_noise_sigma = [[0.01], [0.1]],
     #                     is_use_large_net = False)
-
-    # vehicle_neural_gradient(T = 100,
-    #                         is_check_stop = False, 
-    #                         stopping_criterion = 1e-5,
-    #                         is_re_train = True, 
-    #                         max_iter=100,
-    #                         decay_rate=0.99,
-    #                         decay_rate_max_iters=300)
 # %%
