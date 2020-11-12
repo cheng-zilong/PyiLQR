@@ -7,6 +7,8 @@ from scipy import io
 import cvxpy as cp
 from numba import njit, jitclass, jit
 import numba
+from loguru import logger
+import os 
 
 class iLQRWrapper(object):
     """This is a wrapper class for the iLQR iteraton
@@ -234,77 +236,35 @@ class iLQRWrapper(object):
 
     def clear_obj_fun_value_last(self):
         self.obj_fun_value_last = np.inf
-#############################
-######## Example ############
-######## Log Barrier ########
-#############################
+    
+    def solve(self, example_name, max_iter = 100, is_check_stop = True):
+        """ Solve the problem with classical iLQR
 
-class iLQRLogBarrier(iLQRWrapper):
-    def clear_obj_fun_value_last(self):
-        self.obj_fun_value_last = np.inf
-
-#############################
-######## Example ############
-########## ADMM #############
-#############################
-###### Not done yet #########
-#############################
-class ADMM_iLQR_class(iLQRWrapper):
-    def __init__(self, x_u, dynamic_model, objective_function, n, m, T, init_state, init_input, initial_t):
-        """Initialization of the class 
-        
-            Parameters
-            ----------
-            x_u : sympy.symbols 
-                Vector including system states and input. e.g. x_u = sp.symbols('x_u:6')
-            dynamic_model : dynamic_model_wrapper 
-                The dynamic model of the system
-            objective_function : objective_function_wrapper
-                The objective function (may include the log barrier term)
-            n : int 
-                The number of state variables
-            m : int 
-                The number of input variables
-            T : int 
-                The prediction horizon
-            initial_states : array(n, 1) 
-                The initial state vector
-            initial_input : array(T, m, 1) 
-                The initial input vector
-            initial_t : array(1) 
-                The initial parameter t for the log barrier method
+            Parameter
+            -----------
+            example_name : string
+                Name of the example
+            max_iter : int
+                The max number of iterations of iLQR
+            is_check_stop : boolean
+                Whether check the stopping criterion, if False, then max_iter number of iterations are performed
         """
-        self.x_u_sp_var = x_u
-        (self.dynamic_model_lamdify, 
-        self.gradient_dynamic_model_lamdify) = dynamic_model.return_dynamic_model_and_gradient(x_u)
-        (self.objective_function_lamdify, 
-        self.gradient_objective_function_lamdify, 
-        self.hessian_objective_function_lamdify) = objective_function.return_objective_function_gradient_and_hessian(x_u)
-        
-        self.iLQR_iteration = Create_iLQR_iteration_class(  self.dynamic_model_lamdify, 
-                                                            self.gradient_dynamic_model_lamdify,
-                                                            self.objective_function_lamdify,
-                                                            self.gradient_objective_function_lamdify,
-                                                            self.hessian_objective_function_lamdify,
-                                                            n, m, T, init_state, init_input,
-                                                            additional_parameters_for_dynamic_model=None, 
-                                                            additional_parameters_for_objective_function=[0.5])
-    def forward_pass(self, additional_parameters_for_objective_function, gamma_float64 = 0.5, stopping_criterion_float64 = 1e-6):
-        """ Forward_pass in the iLQR algorithm with simple line search
-        
-            Parameters
-            ----------
-            gamma_float64 : float64 
-                Gamma is the parameter for the line search: alpha=gamma*alpha
-            stopping_criterion : float64 
-                The number of input variables
-
-            Return
-            ----------
-            stopping_criterion_float64: float64
-                The value of the objective function after the line search
-            isStop: Boolean
-                Whether the stopping criterion is reached. True: the stopping criterion is satisfied
-        """
-        return self.iLQR_iteration.forward_pass_insider(gamma_float64, stopping_criterion_float64, None, additional_parameters_for_objective_function, "feasibility", "vanilla")
+        logger.debug("[+ +] Initial Obj.Val.: %.5e"%(self.get_obj_fun_value()))
+        start_time = tm.time()
+        for i in range(max_iter):
+            if i == 1:  # skip the compiling time 
+                start_time = tm.time()
+            iter_start_time = tm.time()
+            self.backward_pass()
+            backward_time = tm.time()
+            obj, isStop = self.forward_pass()
+            forward_time = tm.time()
+            logger.debug("[+ +] Iter.No.%3d   BWTime:%.3e   FWTime:%.3e   Obj.Val.:%.5e"%(
+                         i,  backward_time-iter_start_time,forward_time-backward_time,obj))
+            result_path = os.path.join("logs", example_name, str(i) +".mat")
+            io.savemat(result_path,{"trajectory": self.get_traj()})
+            if isStop and is_check_stop:
+                break
+        end_time = tm.time()
+        logger.debug("[+ +] Completed! All Time:%.5e"%(end_time-start_time))
 #%%iLQR

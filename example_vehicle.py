@@ -4,7 +4,7 @@ import sympy as sp
 import scipy as sci
 import time as tm
 from scipy import io
-from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR, iLQRExample
+from iLQRSolver import DynamicModel, ObjectiveFunction, BasiciLQR, AdvancediLQR, Logger
 from loguru import logger
 from datetime import datetime
 import torch
@@ -103,20 +103,20 @@ def vehicle_vanilla(T = 100, max_iter = 10000, is_check_stop = True):
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+    logger_id = Logger.loguru_start(        file_name = file_name, 
                                             T=T, 
                                             max_iter = max_iter, 
                                             is_check_stop = is_check_stop,
                                             init_state = init_state,
                                             C_matrix = C_matrix,
                                             r_vector = r_vector)
-    vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-    vehicle_example.vanilla_iLQR(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
-    iLQRExample.loguru_end(logger_id)
+    vehicle_example = BasiciLQR.iLQRWrapper(dynamic_model, objective_function)
+    vehicle_example.solve(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
+    Logger.loguru_end(logger_id)
 
 def vehicle_log_barrier(T = 100, max_iter = 10000, is_check_stop = True):
-    file_name = "vehicle_log_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    logger_id = iLQRExample.loguru_start(file_name, T=T, max_iter = max_iter, is_check_stop = is_check_stop)
+    file_name = "vehicle_logbarrier_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    logger_id = Logger.loguru_start(file_name = file_name, T=T, max_iter = max_iter, is_check_stop = is_check_stop)
     #################################
     ######### Dynamic Model #########
     #################################
@@ -167,9 +167,9 @@ def vehicle_log_barrier(T = 100, max_iter = 10000, is_check_stop = True):
     #################################
     ######### iLQR Solver ###########
     #################################
-    vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-    vehicle_example.log_barrier_iLQR(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
-    iLQRExample.loguru_end(logger_id)
+    vehicle_example = AdvancediLQR.LogBarrieriLQR(dynamic_model, objective_function)
+    vehicle_example.solve(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
+    Logger.loguru_end(logger_id)
 
 def vehicle_dd_iLQR(T = 100, 
                     trial_no=100, 
@@ -214,30 +214,30 @@ def vehicle_dd_iLQR(T = 100,
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
-                                            T=T, 
-                                            trial_no = trial_no, 
-                                            stopping_criterion = stopping_criterion, 
-                                            max_iter = max_iter, 
-                                            decay_rate = decay_rate, 
-                                            decay_rate_max_iters = decay_rate_max_iters, 
-                                            gaussian_filter_sigma = gaussian_filter_sigma, 
-                                            gaussian_noise_sigma = gaussian_noise_sigma,
-                                            init_state = init_state,
-                                            C_matrix = C_matrix,
-                                            r_vector = r_vector,
-                                            x0_u_lower_bound = x0_u_lower_bound,
-                                            x0_u_upper_bound = x0_u_upper_bound,
-                                            is_use_large_net = network)
-    vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-    vehicle_example.dd_iLQR(        file_name, nn_dynamic_model, dataset_train, 
-                                    re_train_stopping_criterion=stopping_criterion, 
-                                    max_iter=max_iter,
-                                    decay_rate=decay_rate,
-                                    decay_rate_max_iters=decay_rate_max_iters,
-                                    gaussian_filter_sigma = gaussian_filter_sigma,
-                                    gaussian_noise_sigma = gaussian_noise_sigma)
-    iLQRExample.loguru_end(logger_id)
+    logger_id = Logger.loguru_start(file_name = file_name, 
+                                    T=T, 
+                                    trial_no = trial_no, 
+                                    stopping_criterion = stopping_criterion, 
+                                    max_iter = max_iter, 
+                                    decay_rate = decay_rate, 
+                                    decay_rate_max_iters = decay_rate_max_iters, 
+                                    gaussian_filter_sigma = gaussian_filter_sigma, 
+                                    gaussian_noise_sigma = gaussian_noise_sigma,
+                                    init_state = init_state,
+                                    C_matrix = C_matrix,
+                                    r_vector = r_vector,
+                                    x0_u_lower_bound = x0_u_lower_bound,
+                                    x0_u_upper_bound = x0_u_upper_bound,
+                                    is_use_large_net = network)
+    vehicle_example = AdvancediLQR.DDiLQR(dynamic_model, objective_function)
+    vehicle_example.solve(  file_name, nn_dynamic_model, dataset_train, 
+                            re_train_stopping_criterion=stopping_criterion, 
+                            max_iter=max_iter,
+                            decay_rate=decay_rate,
+                            decay_rate_max_iters=decay_rate_max_iters,
+                            gaussian_filter_sigma = gaussian_filter_sigma,
+                            gaussian_noise_sigma = gaussian_noise_sigma)
+    Logger.loguru_end(logger_id)
 
 def vehicle_net_iLQR(   T = 100, 
                         trial_no=100,
@@ -247,7 +247,7 @@ def vehicle_net_iLQR(   T = 100,
                         decay_rate_max_iters=300,
                         gaussian_filter_sigma = 10,
                         gaussian_noise_sigma = [[0.01], [0.1]],
-                        is_use_large_net = False):
+                        network = "small"):
     file_name = "vehicle_net_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     #################################
     ######### Dynamic Model #########
@@ -270,17 +270,20 @@ def vehicle_net_iLQR(   T = 100,
     x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=trial_no)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    if is_use_large_net:
+    if network == "large":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_large.model")
-    else:
+    elif network == "small":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small.model")
+    elif network == "small_residual":
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallResidualNetwork(n+m, n),init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small_residual.model")
 
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+    logger_id = Logger.loguru_start(   file_name = file_name, 
                                             T=T, 
                                             trial_no = trial_no, 
                                             stopping_criterion = stopping_criterion, 
@@ -294,33 +297,24 @@ def vehicle_net_iLQR(   T = 100,
                                             r_vector = r_vector,
                                             x0_u_lower_bound = x0_u_lower_bound,
                                             x0_u_upper_bound = x0_u_upper_bound,
-                                            is_use_large_net = is_use_large_net)
-    vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-    vehicle_example.net_iLQR(        file_name, nn_dynamic_model, dataset_train, 
+                                            network = network)
+    vehicle_example = AdvancediLQR.NetiLQR(dynamic_model, objective_function)
+    vehicle_example.solve(        file_name, nn_dynamic_model, dataset_train, 
                                     re_train_stopping_criterion=stopping_criterion, 
                                     max_iter=max_iter,
                                     decay_rate=decay_rate,
                                     decay_rate_max_iters=decay_rate_max_iters,
                                     gaussian_filter_sigma = gaussian_filter_sigma,
                                     gaussian_noise_sigma = gaussian_noise_sigma)
-    iLQRExample.loguru_end(logger_id)
+    Logger.loguru_end(logger_id)
+
 # %%
 if __name__ == "__main__":
     # vehicle_vanilla(T = 100, max_iter=10000, is_check_stop = True)
 
     # vehicle_log_barrier(T = 100, max_iter=10000, is_check_stop = True)
 
-    vehicle_dd_iLQR(    T = 100,
-                        trial_no=100,
-                        stopping_criterion = 1e-4,
-                        max_iter=1000,
-                        decay_rate=0.99,
-                        decay_rate_max_iters=300,
-                        gaussian_filter_sigma = 5,
-                        gaussian_noise_sigma = [[0.01], [0.1]],
-                        network = "small_residual")
-
-    # vehicle_net_iLQR(   T = 100,
+    # vehicle_dd_iLQR(    T = 100,
     #                     trial_no=100,
     #                     stopping_criterion = 1e-4,
     #                     max_iter=1000,
@@ -328,5 +322,15 @@ if __name__ == "__main__":
     #                     decay_rate_max_iters=300,
     #                     gaussian_filter_sigma = 5,
     #                     gaussian_noise_sigma = [[0.01], [0.1]],
-    #                     is_use_large_net = False)
+    #                     network = "small")
+
+    vehicle_net_iLQR(   T = 100,
+                        trial_no=100,
+                        stopping_criterion = 1e-4,
+                        max_iter=1000,
+                        decay_rate=0.99,
+                        decay_rate_max_iters=300,
+                        gaussian_filter_sigma = 5,
+                        gaussian_noise_sigma = [[0.01], [0.1]],
+                        network = "small")
 # %%
