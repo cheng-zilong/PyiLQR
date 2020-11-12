@@ -18,49 +18,6 @@ from loguru import logger
 
 torch.manual_seed(42)
 device = "cuda:0"
-# class Residual(nn.Module):  #@save
-#     """The Residual block of ResNet."""
-#     def __init__(self, input_channels, output_channels, is_shorcut = True):
-#         super().__init__()
-#         self.is_shorcut = is_shorcut
-#         self.linear1 = nn.Linear(input_channels, output_channels)
-#         self.bn1 = nn.BatchNorm1d(output_channels)
-#         self.relu = nn.ReLU()
-#         self.linear2 = nn.Linear(output_channels, output_channels)
-#         self.bn2 = nn.BatchNorm1d(output_channels)
-
-#         self.shorcut = nn.Linear(input_channels, output_channels)
-#         self.main_track = nn.Sequential(self.linear1, self.bn1, self.relu, self.linear2, self.bn2)
-#     def forward(self, X):
-#         if self.is_shorcut:
-#             Y = self.main_track(X) + self.shorcut(X)
-#         else:
-#             Y = self.main_track(X) + X
-#         return torch.nn.functional.relu(Y)
-        
-# class DummyNetwork(nn.Module):
-#     def __init__(self, in_dim, out_dim):
-#         super().__init__()
-#         layer1_no=64
-#         layer2_no=32
-#         layer3_no=16
-#         layer4_no=8
-
-#         self.layer = nn.Sequential( Residual(in_dim, layer1_no),
-#                                     Residual(layer1_no, layer1_no, is_shorcut=False),
-#                                     Residual(layer1_no, layer2_no),
-#                                     Residual(layer2_no, layer2_no, is_shorcut=False),
-#                                     Residual(layer2_no, layer3_no),
-#                                     Residual(layer3_no, layer3_no, is_shorcut=False),
-#                                     Residual(layer3_no, layer4_no),
-#                                     Residual(layer4_no, layer4_no, is_shorcut=False),
-#                                     nn.Linear(layer4_no, out_dim))
-
-#     def forward(self, x):
-#         x = self.layer(x)
-#         return x
-        
-
 class DynamicModelDataSetWrapper(object):
     """This class generates the dynamic model data for training neural networks
     """
@@ -142,87 +99,6 @@ class DynamicModelDataSetWrapper(object):
             else:
                 self.update_index  = 0
         logger.debug("[+ +] Dataset is updated!")
-    def get_data(self):
-        """ Return the data from the dataset
-
-            Return
-            ---------
-            X : tensor(dataset_size, n+m)\\
-            Y : tensor(dataset_size, n)
-        """
-        return self.X, self. Y
-
-class DynamicModelGradientDataSetWrapper(object):
-    """This class generates the gradient of a dynamic model data for training neural networks
-    """
-    def _init_dataset(self, dynamic_model, x0_u_bound):
-        """ Inner method, initialize the gradient dataset of a system model
-        """
-        self.dataset_x = torch.zeros((self.Trial_No, self.T, self.n+self.m,1)).cuda()
-        self.dataset_y = torch.zeros((self.Trial_No, self.T, self.n*(self.n+self.m),1)).cuda()
-        # The index of the dataset for the next time updating
-        self.update_index = 0
-        x0_u_lower_bound, x0_u_upper_bound = x0_u_bound
-        for i in range(self.Trial_No):
-            x0 = np.random.uniform(x0_u_lower_bound[:self.n], x0_u_upper_bound[:self.n]).reshape(-1,1)
-            input_trajectory = np.expand_dims(np.random.uniform(x0_u_lower_bound[self.n:], x0_u_upper_bound[self.n:], (self.T, self.m)), axis=2)
-            new_trajectory = dynamic_model.eval_traj(x0, input_trajectory)
-            self.dataset_x[i] = torch.from_numpy(new_trajectory).float().cuda()
-            self.dataset_y[i,:,:,0] = torch.from_numpy(self.dynamic_model.eval_grad_dynamic_model(new_trajectory).reshape(self.T, self.n*(self.n+self.m))).float().cuda()
-        self.X = self.dataset_x.view(self.dataset_size, self.n+self.m)
-        self.Y = self.dataset_y.view(self.dataset_size, self.n*(self.n+self.m))
-
-    def __init__(self, dynamic_model, x0_u_bound, Trial_No):
-        """ Initialization
-            
-            Parameters
-            ---------
-            dynamic_model : DynamicModelWrapper
-                The system generating data
-            x0_u_bound : tuple (x0_u_lower_bound, x0_u_upper_bound)
-                x0_u_lower_bound : list(m+n)
-                x0_u_upper_bound : list(m+n)
-                Since you are generating the data with random initial states and inputs, 
-                you need to give
-                the range of the initial system state variables, and
-                the range of the system input variables
-            Trial_No : int
-                The number of trials 
-                The dataset size is Trial_No*(T-1)
-        """
-        self.dynamic_model = dynamic_model
-        self.Trial_No = Trial_No
-        self.T = dynamic_model.T
-        self.n = dynamic_model.n
-        self.m = dynamic_model.m
-        self.dataset_size = self.Trial_No*self.T
-        self._init_dataset(dynamic_model, x0_u_bound)
-
-    def update_dataset(self, new_trajectory):
-        """ Insert new data to the dataset and delete the oldest data
-
-            Parameter
-            -------
-            new_trajectory : array(T, n+m, 1) or list
-                The new trajectory inserted in to the dataset
-        """
-        if isinstance(new_trajectory, list):
-            for trajectory in new_trajectory:
-                self.dataset_x[self.update_index] = torch.from_numpy(trajectory).float().cuda()
-                self.dataset_y[self.update_index,:,:,0] = torch.from_numpy(self.dynamic_model.eval_grad_dynamic_model(trajectory).reshape(self.T, self.n*(self.n+self.m))).float().cuda()
-                if self.update_index < self.Trial_No - 1:
-                    self.update_index = self.update_index + 1
-                else:
-                    self.update_index  = 0
-        else:
-            self.dataset_x[self.update_index] = torch.from_numpy(new_trajectory).float().cuda()
-            self.dataset_y[self.update_index,:,:,0] = torch.from_numpy(self.dynamic_model.eval_grad_dynamic_model(new_trajectory).reshape(self.T, self.n*(self.n+self.m))).float().cuda()
-            if self.update_index < self.Trial_No - 1:
-                self.update_index = self.update_index + 1
-            else:
-                self.update_index  = 0
-        logger.debug("[+ +] Dataset is updated!")
-    
     def get_data(self):
         """ Return the data from the dataset
 
@@ -414,7 +290,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
         model_path = os.path.join("models", model_name)
         if not os.path.exists(model_path):
             logger_id = logger.add(os.path.join("models", model_name + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".log"), format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
-            logger.debug("[+ +] Model file " + model_name + " does NOT exist. Pre-traning starts...")
+            logger.debug("[+ +] Model file \"" + model_name + "\" does NOT exist. Pre-traning starts...")
             self.writer = SummaryWriter()
             loss_fun = nn.MSELoss()
             # self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
@@ -544,24 +420,6 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
             # F_matrix_list[tau] = jacobian(self.model, torch.from_numpy().float()).squeeze().numpy()
         # get_batch_jacobian(self.model, trajectory_cuda, 4)
         return self.F_matrix_all.cpu().double().numpy()
-
-class NeuralGradientDynamicModelWrapper(NeuralDynamicModelWrapper):
-    """ This is a class to create a gradient system model using neural networks
-    """
-    def next_state(self, current_state_and_input):
-        raise Exception("Cannot find next state with NeuralGradientDynamicModel!")
-
-    def eval_traj(self, init_states=None, input_traj=None):
-        raise Exception("Cannot evaluate trajectory with NeuralGradientDynamicModel!")
-
-    def update_traj(self, old_traj, K_matrix_all, k_vector_all, alpha): 
-        raise Exception("Cannot update trajectory with NeuralGradientDynamicModel!")
-
-    def eval_grad_dynamic_model(self, trajectory):
-        trajectory_cuda = torch.from_numpy(trajectory[:,:,0]).float().cuda()
-        with torch.no_grad():
-            grad = self.model(trajectory_cuda).cpu().double().numpy()
-            return grad.reshape(self.T, self.n, self.m +self.n)
 
 def vehicle(h_constant = 0.1):
     """Model of a vehicle

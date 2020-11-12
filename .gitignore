@@ -59,7 +59,7 @@ coverage.xml
 *.pot
 
 # Django stuff:
-log/
+logs/
 models/
 mat/
 *.log

@@ -4,7 +4,7 @@ import sympy as sp
 import scipy as sci
 import time as tm
 from scipy import io
-from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR, iLQRExample
+from iLQRSolver import DynamicModel, ObjectiveFunction, iLQR, iLQRExample, Logger
 from loguru import logger
 from datetime import datetime
 import torch
@@ -107,7 +107,7 @@ def cartpole1_vanilla(T = 300, max_iter = 10000, is_check_stop = True):
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+    logger_id = Logger.loguru_start(   file_name = file_name, 
                                             T=T, 
                                             max_iter = max_iter, 
                                             is_check_stop = is_check_stop,
@@ -116,7 +116,7 @@ def cartpole1_vanilla(T = 300, max_iter = 10000, is_check_stop = True):
                                             obj_terminal_C = add_param_obj[-1])
     cartpole1_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
     cartpole1_example.vanilla_iLQR(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
-    iLQRExample.loguru_end(logger_id)
+    Logger.loguru_end(logger_id)
 
 def cartpole1_dd_iLQR(  T = 300, 
                         trial_no = 100,
@@ -167,7 +167,7 @@ def cartpole1_dd_iLQR(  T = 300,
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+    logger_id = Logger.loguru_start(   file_name = file_name, 
                                             T=T, 
                                             trial_no = trial_no,  
                                             stopping_criterion = stopping_criterion,  
@@ -190,7 +190,7 @@ def cartpole1_dd_iLQR(  T = 300,
                                     decay_rate_max_iters=decay_rate_max_iters,
                                     gaussian_filter_sigma = gaussian_filter_sigma,
                                     gaussian_noise_sigma = gaussian_noise_sigma)
-    iLQRExample.loguru_end(logger_id)
+    Logger.loguru_end(logger_id)
 
 def cartpole1_net_iLQR( T = 300, 
                         trial_no = 100,
@@ -237,7 +237,7 @@ def cartpole1_net_iLQR( T = 300,
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = iLQRExample.loguru_start(   file_name = file_name, 
+    logger_id = Logger.loguru_start(   file_name = file_name, 
                                             T=T, 
                                             trial_no = trial_no,  
                                             stopping_criterion = stopping_criterion,  
@@ -260,57 +260,7 @@ def cartpole1_net_iLQR( T = 300,
                                     decay_rate_max_iters=decay_rate_max_iters,
                                     gaussian_filter_sigma = gaussian_filter_sigma,
                                     gaussian_noise_sigma = gaussian_noise_sigma)
-    iLQRExample.loguru_end(logger_id)
-
-# cartpole1 Neural Gradient
-def cartpole1_neural_gradient(  T = 300,
-                                is_check_stop = False, 
-                                stopping_criterion = 1e-5,
-                                is_re_train = True, 
-                                max_iter=300,
-                                decay_rate=0.995,
-                                decay_rate_max_iters=200):
-    file_name = "cartpole1_neural_gradient_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    #################################
-    ######### Dynamic Model #########
-    #################################
-    cartpole, x_u, n, m = DynamicModel.cart_pole()
-    init_state = np.asarray([np.pi,0,0,0],dtype=np.float64).reshape(-1,1)
-    init_input = np.zeros((T,m,1))
-    dynamic_model = DynamicModel.DynamicModelWrapper(cartpole, x_u, init_state, init_input, T)
-    #################################
-    ##### Objective Function ########
-    #################################
-    C_matrix_diag = sp.symbols("c:5")
-    add_param_obj = np.zeros((T, 5), dtype = np.float64)
-    for tau in range(T):
-        if tau < T-1:
-            add_param_obj[tau] = np.asarray((1, 0.1, 0.1, 0.1, 1))
-        else: 
-            add_param_obj[tau] = np.asarray((10000, 100, 0, 0, 0))
-    objective_function = ObjectiveFunction.ObjectiveFunctionWrapper((x_u)@np.diag(np.asarray(C_matrix_diag))@(x_u), x_u_var = x_u, add_param_var=C_matrix_diag, add_param=add_param_obj)
-    #################################
-    ########## Training #############
-    #################################
-    x0_u_lower_bound = [np.pi, -0, -0, -0, -10]
-    x0_u_upper_bound = [np.pi,  0,  0,  0,  10]
-    x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
-    dataset_train = DynamicModel.DynamicModelGradientDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=100)
-    dataset_vali = DynamicModel.DynamicModelGradientDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    nn_dynamic_model = DynamicModel.NeuralGradientDynamicModelWrapper(SmallNetwork(n+m, n*(n+m)),init_state,init_input,T)
-    nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_gradient.model")
-    #################################
-    ######### iLQR Solver ###########
-    #################################
-    cartpole1_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
-
-    cartpole1_example.dd_iLQR(file_name, nn_dynamic_model, dataset_train, 
-                                    max_iter = max_iter,
-                                    is_re_train = is_re_train, 
-                                    re_train_stopping_criterion = stopping_criterion, 
-                                    is_check_stop = is_check_stop,
-                                    decay_rate= decay_rate,
-                                    decay_rate_max_iters=decay_rate_max_iters)
+    Logger.loguru_end(logger_id)
 # %%
 if __name__ == "__main__":
     # cartpole1_vanilla(T = 150, max_iter=10000, is_check_stop = True)
@@ -323,7 +273,7 @@ if __name__ == "__main__":
                         decay_rate_max_iters=200,
                         gaussian_filter_sigma = 5,
                         gaussian_noise_sigma = 1,
-                        network = "small_residual")
+                        network = "small")
 
     # cartpole1_net_iLQR(  T = 150,
     #                     trial_no=100,
