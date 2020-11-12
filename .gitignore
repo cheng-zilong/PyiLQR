@@ -60,6 +60,7 @@ coverage.xml
 
 # Django stuff:
 logs/
+log/
 models/
 mat/
 *.log
