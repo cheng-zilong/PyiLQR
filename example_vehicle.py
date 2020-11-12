@@ -15,6 +15,48 @@ import sys
 logger.remove()
 logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
 
+class Residual(nn.Module):  
+    """The Residual block of ResNet."""
+    def __init__(self, input_channels, output_channels, is_shorcut = True):
+        super().__init__()
+        self.is_shorcut = is_shorcut
+        self.linear1 = nn.Linear(input_channels, output_channels)
+        self.bn1 = nn.BatchNorm1d(output_channels)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(output_channels, output_channels)
+        self.bn2 = nn.BatchNorm1d(output_channels)
+
+        self.shorcut = nn.Linear(input_channels, output_channels)
+        self.main_track = nn.Sequential(self.linear1, self.bn1, self.relu, self.linear2, self.bn2)
+    def forward(self, X):
+        if self.is_shorcut:
+            Y = self.main_track(X) + self.shorcut(X)
+        else:
+            Y = self.main_track(X) + X
+        return torch.nn.functional.relu(Y)
+        
+class SmallResidualNetwork(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        layer1_no=64
+        layer2_no=32
+        layer3_no=16
+        layer4_no=8
+
+        self.layer = nn.Sequential( Residual(in_dim, layer1_no),
+                                    Residual(layer1_no, layer1_no, is_shorcut=False),
+                                    Residual(layer1_no, layer2_no),
+                                    Residual(layer2_no, layer2_no, is_shorcut=False),
+                                    Residual(layer2_no, layer3_no),
+                                    Residual(layer3_no, layer3_no, is_shorcut=False),
+                                    Residual(layer3_no, layer4_no),
+                                    Residual(layer4_no, layer4_no, is_shorcut=False),
+                                    nn.Linear(layer4_no, out_dim))
+
+    def forward(self, x):
+        x = self.layer(x)
+        return x
+
 class SmallNetwork(nn.Module):
     """Here is a dummy network that can work well on the vehicle model
     """
@@ -137,7 +179,7 @@ def vehicle_dd_iLQR(T = 100,
                     decay_rate_max_iters=300,
                     gaussian_filter_sigma = 10,
                     gaussian_noise_sigma = [[0.01], [0.1]],
-                    is_use_large_net = False):
+                    network = "small"):
     file_name = "vehicle_dd_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     #################################
     ######### Dynamic Model #########
@@ -160,13 +202,15 @@ def vehicle_dd_iLQR(T = 100,
     x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=trial_no)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    if is_use_large_net:
+    if network == "large":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_large.model")
-    else:
+    elif network == "small":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small.model")
-
+    elif network == "small_residual":
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallResidualNetwork(n+m, n),init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_neural_small_residual.model")
     #################################
     ######### iLQR Solver ###########
     #################################
@@ -184,7 +228,7 @@ def vehicle_dd_iLQR(T = 100,
                                             r_vector = r_vector,
                                             x0_u_lower_bound = x0_u_lower_bound,
                                             x0_u_upper_bound = x0_u_upper_bound,
-                                            is_use_large_net = is_use_large_net)
+                                            is_use_large_net = network)
     vehicle_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
     vehicle_example.dd_iLQR(        file_name, nn_dynamic_model, dataset_train, 
                                     re_train_stopping_criterion=stopping_criterion, 
@@ -311,7 +355,17 @@ if __name__ == "__main__":
 
     # vehicle_log_barrier(T = 100, max_iter=10000, is_check_stop = True)
 
-    # vehicle_dd_iLQR(    T = 100,
+    vehicle_dd_iLQR(    T = 100,
+                        trial_no=100,
+                        stopping_criterion = 1e-4,
+                        max_iter=1000,
+                        decay_rate=0.99,
+                        decay_rate_max_iters=300,
+                        gaussian_filter_sigma = 5,
+                        gaussian_noise_sigma = [[0.01], [0.1]],
+                        network = "small_residual")
+
+    # vehicle_net_iLQR(   T = 100,
     #                     trial_no=100,
     #                     stopping_criterion = 1e-4,
     #                     max_iter=1000,
@@ -320,16 +374,6 @@ if __name__ == "__main__":
     #                     gaussian_filter_sigma = 5,
     #                     gaussian_noise_sigma = [[0.01], [0.1]],
     #                     is_use_large_net = False)
-
-    vehicle_net_iLQR(   T = 100,
-                        trial_no=100,
-                        stopping_criterion = 1e-4,
-                        max_iter=1000,
-                        decay_rate=0.99,
-                        decay_rate_max_iters=300,
-                        gaussian_filter_sigma = 5,
-                        gaussian_noise_sigma = [[0.01], [0.1]],
-                        is_use_large_net = False)
 
     # vehicle_neural_gradient(T = 100,
     #                         is_check_stop = False, 

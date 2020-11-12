@@ -15,6 +15,45 @@ import sys
 logger.remove()
 logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
 
+class Residual(nn.Module):  
+    """The Residual block of ResNet."""
+    def __init__(self, input_channels, output_channels, is_shorcut = True):
+        super().__init__()
+        self.is_shorcut = is_shorcut
+        self.linear1 = nn.Linear(input_channels, output_channels)
+        self.bn1 = nn.BatchNorm1d(output_channels)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(output_channels, output_channels)
+        self.bn2 = nn.BatchNorm1d(output_channels)
+
+        self.shorcut = nn.Linear(input_channels, output_channels)
+        self.main_track = nn.Sequential(self.linear1, self.bn1, self.relu, self.linear2, self.bn2)
+    def forward(self, X):
+        if self.is_shorcut:
+            Y = self.main_track(X) + self.shorcut(X)
+        else:
+            Y = self.main_track(X) + X
+        return torch.nn.functional.relu(Y)
+        
+class SmallResidualNetwork(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        layer1_no=64
+        layer2_no=32
+        layer3_no=16
+        layer4_no=8
+
+        self.layer = nn.Sequential( Residual(in_dim, layer1_no),
+                                    Residual(layer1_no, layer2_no),
+                                    Residual(layer2_no, layer3_no),
+                                    Residual(layer3_no, layer4_no),
+                                    nn.Linear(layer4_no, out_dim))
+
+    def forward(self, x):
+        x = self.layer(x)
+        return x
+
+
 class SmallNetwork(nn.Module):
     """Here is a dummy network that can work well on the vehicle model
     """
@@ -87,7 +126,7 @@ def cartpole1_dd_iLQR(  T = 300,
                         decay_rate_max_iters=300,
                         gaussian_filter_sigma = 10,
                         gaussian_noise_sigma = 1,
-                        is_use_large_net = False):
+                        network = "small"):
     file_name = "cartpole1_dd_iLQR_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     #################################
     ######### Dynamic Model #########
@@ -115,12 +154,15 @@ def cartpole1_dd_iLQR(  T = 300,
     x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=trial_no)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
-    if is_use_large_net:
+    if network == "large":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n), init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_large.model")
-    else:
+    elif network == "small":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n), init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small.model")
+    elif network == "small_residual":
+        nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallResidualNetwork(n+m, n), init_state, init_input, T)
+        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small_residual.model")
 
     #################################
     ######### iLQR Solver ###########
@@ -139,7 +181,7 @@ def cartpole1_dd_iLQR(  T = 300,
                                             obj_terminal_C = add_param_obj[-1],
                                             x0_u_lower_bound = x0_u_lower_bound,
                                             x0_u_upper_bound = x0_u_upper_bound,
-                                            is_use_large_net = is_use_large_net)
+                                            is_use_large_net = network)
     cartpole1_example = iLQRExample.iLQRExample(dynamic_model, objective_function)
     cartpole1_example.dd_iLQR(file_name, nn_dynamic_model, dataset_train,
                                     re_train_stopping_criterion=stopping_criterion, 
@@ -192,7 +234,6 @@ def cartpole1_net_iLQR( T = 300,
     else:
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n), init_state, init_input, T)
         nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small.model")
-
     #################################
     ######### iLQR Solver ###########
     #################################
@@ -274,7 +315,17 @@ def cartpole1_neural_gradient(  T = 300,
 if __name__ == "__main__":
     # cartpole1_vanilla(T = 150, max_iter=10000, is_check_stop = True)
 
-    # cartpole1_dd_iLQR(  T = 150,
+    cartpole1_dd_iLQR(  T = 150,
+                        trial_no=100,
+                        stopping_criterion = 1e-4,
+                        max_iter=1000,
+                        decay_rate=0.98,
+                        decay_rate_max_iters=200,
+                        gaussian_filter_sigma = 5,
+                        gaussian_noise_sigma = 1,
+                        network = "small_residual")
+
+    # cartpole1_net_iLQR(  T = 150,
     #                     trial_no=100,
     #                     stopping_criterion = 1e-4,
     #                     max_iter=1000,
@@ -282,17 +333,7 @@ if __name__ == "__main__":
     #                     decay_rate_max_iters=200,
     #                     gaussian_filter_sigma = 10,
     #                     gaussian_noise_sigma = 1,
-    #                     is_use_large_net = False)
-
-    cartpole1_net_iLQR(  T = 150,
-                        trial_no=100,
-                        stopping_criterion = 1e-4,
-                        max_iter=1000,
-                        decay_rate=0.98,
-                        decay_rate_max_iters=200,
-                        gaussian_filter_sigma = 10,
-                        gaussian_noise_sigma = 1,
-                        is_use_large_net = True)
+    #                     is_use_large_net = True)
 
     # cartpole1_neural_gradient(  T = 300,
     #                             is_check_stop = False, 
