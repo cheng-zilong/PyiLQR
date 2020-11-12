@@ -13,6 +13,7 @@ import torch_optimizer as optim
 from torch.autograd.functional import jacobian
 from torch.utils.tensorboard import SummaryWriter
 import os
+from datetime import datetime
 from loguru import logger
 
 torch.manual_seed(42)
@@ -410,8 +411,10 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                 the model with the given name will be saved as a file
         """
         # if the model exists, load the model directly
-        if not os.path.exists("Models\\"+model_name):
-            logger.debug("[+ +] Model file does NOT exist. Pre-traning starts...")
+        model_path = os.path.join("models", model_name)
+        if not os.path.exists(model_path):
+            logger_id = logger.add(os.path.join("models", model_name + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".log"), format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
+            logger.debug("[+ +] Model file " + model_name + " does NOT exist. Pre-traning starts...")
             self.writer = SummaryWriter()
             loss_fun = nn.MSELoss()
             # self.optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
@@ -444,12 +447,13 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                     self.writer.add_scalar('Obj/Vali', obj_vali.item(), epoch)
                     if obj_train.item() < stopping_criterion:
                         logger.debug("[+ +] Pre-training finished! Model file \"" + model_name + "\" is saved!")
-                        torch.save(self.model.state_dict(), "Models\\"+model_name)                    
+                        torch.save(self.model.state_dict(), model_path)         
+                        logger.remove(logger_id)
                         return
             raise Exception("Maximum epoch is reached!")
         else:
             logger.debug("[+ +] Model file \"" + model_name + "\" exists. Loading....")
-            self.model.load_state_dict(torch.load("Models\\"+model_name))
+            self.model.load_state_dict(torch.load(model_path))
             logger.debug("[+ +] Loading Completed!")
             self.model.eval()
 
