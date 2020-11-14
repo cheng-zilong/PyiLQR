@@ -91,7 +91,7 @@ def vehicle_vanilla(T = 100, max_iter = 10000, is_check_stop = True):
     ######### Dynamic Model #########
     #################################
     vehicle, x_u, n, m = DynamicModel.vehicle()
-    init_state = np.asarray([0,0,0,4],dtype=np.float64).reshape(-1,1)
+    init_state = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
     init_input = np.zeros((T,m,1))
     dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, init_state, init_input, T)
     #################################
@@ -175,6 +175,7 @@ def vehicle_dd_iLQR(T = 100,
                     trial_no=100, 
                     stopping_criterion = 1e-4, 
                     max_iter=100, 
+                    max_line_search = 50,
                     decay_rate=0.99, 
                     decay_rate_max_iters=300,
                     gaussian_filter_sigma = 10,
@@ -185,7 +186,7 @@ def vehicle_dd_iLQR(T = 100,
     ######### Dynamic Model #########
     #################################
     vehicle, x_u, n, m = DynamicModel.vehicle()
-    init_state = np.asarray([0,0,0,4],dtype=np.float64).reshape(-1,1)
+    init_state = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
     init_input = np.zeros((T,m,1))
     dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, init_state, init_input, T)
     #################################
@@ -219,6 +220,7 @@ def vehicle_dd_iLQR(T = 100,
                                     trial_no = trial_no, 
                                     stopping_criterion = stopping_criterion, 
                                     max_iter = max_iter, 
+                                    max_line_search = max_line_search,
                                     decay_rate = decay_rate, 
                                     decay_rate_max_iters = decay_rate_max_iters, 
                                     gaussian_filter_sigma = gaussian_filter_sigma, 
@@ -233,6 +235,7 @@ def vehicle_dd_iLQR(T = 100,
     vehicle_example.solve(  file_name, nn_dynamic_model, dataset_train, 
                             re_train_stopping_criterion=stopping_criterion, 
                             max_iter=max_iter,
+                            max_line_search = max_line_search,
                             decay_rate=decay_rate,
                             decay_rate_max_iters=decay_rate_max_iters,
                             gaussian_filter_sigma = gaussian_filter_sigma,
@@ -310,11 +313,22 @@ def vehicle_net_iLQR(   T = 100,
 
 # %%
 if __name__ == "__main__":
-    # vehicle_vanilla(T = 100, max_iter=10000, is_check_stop = True)
+    vehicle_vanilla(T = 100, max_iter=10000, is_check_stop = True)
 
     # vehicle_log_barrier(T = 100, max_iter=10000, is_check_stop = True)
 
     # vehicle_dd_iLQR(    T = 100,
+    #                     trial_no=100,
+    #                     stopping_criterion = 1e-4,
+    #                     max_iter=1000,
+    #                     max_line_search = 10,
+    #                     decay_rate=0.99,
+    #                     decay_rate_max_iters=300,
+    #                     gaussian_filter_sigma = 5,
+    #                     gaussian_noise_sigma = [[0.01], [0.1]],
+    #                     network = "small")
+
+    # vehicle_net_iLQR(   T = 100,
     #                     trial_no=100,
     #                     stopping_criterion = 1e-4,
     #                     max_iter=1000,
@@ -323,14 +337,4 @@ if __name__ == "__main__":
     #                     gaussian_filter_sigma = 5,
     #                     gaussian_noise_sigma = [[0.01], [0.1]],
     #                     network = "small")
-
-    vehicle_net_iLQR(   T = 100,
-                        trial_no=100,
-                        stopping_criterion = 1e-4,
-                        max_iter=1000,
-                        decay_rate=0.99,
-                        decay_rate_max_iters=300,
-                        gaussian_filter_sigma = 5,
-                        gaussian_noise_sigma = [[0.01], [0.1]],
-                        network = "small")
 # %%

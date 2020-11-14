@@ -87,6 +87,7 @@ class DDiLQR(BasiciLQR.iLQRWrapper):
                 dataset_train, 
                 re_train_stopping_criterion = 1e-5, 
                 max_iter = 100, 
+                max_line_search = 50,
                 decay_rate = 1, 
                 decay_rate_max_iters = 300,
                 gaussian_filter_sigma = 10,
@@ -126,7 +127,7 @@ class DDiLQR(BasiciLQR.iLQRWrapper):
             F_matrix = gaussian_filter1d(F_matrix, sigma = gaussian_filter_sigma, axis=0)
             self.update_F_matrix(F_matrix)
             self.backward_pass()
-            obj_val, isStop = self.forward_pass()
+            obj_val, isStop = self.forward_pass(max_line_search=max_line_search)
             if i < decay_rate_max_iters:
                 re_train_stopping_criterion = re_train_stopping_criterion * decay_rate
             iter_end_time = tm.time()
@@ -140,7 +141,7 @@ class DDiLQR(BasiciLQR.iLQRWrapper):
                 else:
                     trajectory_noisy = self.dynamic_model.eval_traj(input_traj = (trajectory[:,self.dynamic_model.n:]+np.random.normal(0, gaussian_noise_sigma, [self.dynamic_model.T,self.dynamic_model.m,1])))
                 new_data += [trajectory_noisy]
-                dataset_train.update_dataset(new_data[-int(self.dynamic_model.T/5):])
+                dataset_train.update_dataset(new_data[-int(dataset_train.Trial_No/5):]) # at most update 20% dataset
                 result_path = os.path.join("logs", example_name, str(i) +".mat")
                 io.savemat(result_path,{"optimal_trajectory": self.get_traj(), "trajectroy_noisy": trajectory_noisy})
                 nn_dynamic_model.re_train(dataset_train, max_epoch = 100000, stopping_criterion = re_train_stopping_criterion)
@@ -217,9 +218,10 @@ class NetiLQR(BasiciLQR.iLQRWrapper):
                     trajectory_noisy = trajectory
                 else:
                     trajectory_noisy = self.dynamic_model.eval_traj(input_traj = (trajectory[:,self.dynamic_model.n:]+np.random.normal(0, gaussian_noise_sigma, [self.dynamic_model.T,self.dynamic_model.m,1])))
-                dataset_train.update_dataset(new_data[-int(max_iter/5):]) # at most update 20% dataset
+                new_data += [trajectory_noisy]
+                dataset_train.update_dataset(new_data[-int(dataset_train.Trial_No/5):]) # at most update 20% dataset
                 result_path = os.path.join("logs", example_name, str(i) +".mat")
-                io.savemat(result_path,{"optimal_trajectory": self.get_traj(), "trajectroy_noisy": trajectory_noisy})
+                io.savemat(result_path,{"optimal_trajectory": trajectory, "trajectroy_noisy": trajectory_noisy})
                 nn_dynamic_model.re_train(dataset_train, max_epoch = 100000, stopping_criterion = re_train_stopping_criterion)
                 net_system_iLQR.clear_obj_fun_value_last()
                 new_data = []

@@ -33,7 +33,8 @@ class iLQRWrapper(object):
         # Initialize the trajectory, F_matrix, objective_function_value_last, C_matrix and c_vector
         self.trajectory = self.dynamic_model.eval_traj()
         self.F_matrix = self.dynamic_model.eval_grad_dynamic_model(self.trajectory)
-        self.obj_fun_value_last = self.obj_fun.eval_obj_fun(self.trajectory)
+        self.init_obj = self.obj_fun.eval_obj_fun(self.trajectory)
+        self.obj_fun_value_last = self.init_obj
         self.c_vector = self.obj_fun.eval_grad_obj_fun(self.trajectory)
         self.C_matrix = self.obj_fun.eval_hessian_obj_fun(self.trajectory)
 
@@ -235,7 +236,7 @@ class iLQRWrapper(object):
         return self.obj_fun_value_last
 
     def clear_obj_fun_value_last(self):
-        self.obj_fun_value_last = np.inf
+        self.obj_fun_value_last = self.init_obj
     
     def solve(self, example_name, max_iter = 100, is_check_stop = True):
         """ Solve the problem with classical iLQR
