@@ -66,8 +66,8 @@ class LogBarrieriLQR(BasiciLQR.iLQRWrapper):
         end_time = tm.time()
         logger.debug("[+ +] Completed! All Time:%.5e"%(end_time-start_time))
 
-class DDiLQR(BasiciLQR.iLQRWrapper):
-    """This is an data-driven iLQR class
+class NNiLQR(BasiciLQR.iLQRWrapper):
+    """This is an Neural Network iLQR class
     """
     def __init__(self, dynamic_model, obj_fun):
         """ Initialization
@@ -119,6 +119,8 @@ class DDiLQR(BasiciLQR.iLQRWrapper):
         logger.debug("[+ +] Initial Obj.Val.: %.5e"%(self.get_obj_fun_value()))
         trajectory = self.get_traj()
         new_data = []
+        result_obj_val = np.zeros(max_iter)
+        result_iter_time = np.zeros(max_iter)
         for i in range(int(max_iter)):
             if i == 1:  # skip the compiling time 
                 start_time = tm.time()
@@ -134,6 +136,8 @@ class DDiLQR(BasiciLQR.iLQRWrapper):
             iter_time = iter_end_time-iter_start_time
             logger.debug("[+ +] Iter.No.:%3d  Iter.Time:%.3e   Obj.Val.:%.5e"%(
                                     i,        iter_time,       obj_val,   ))
+            result_obj_val[i] = obj_val
+            result_iter_time[i] = iter_time
             trajectory = self.get_traj()
             if isStop: 
                 if len(new_data) != 0: # Ensure the optimal trajectroy being in the dataset
@@ -144,11 +148,12 @@ class DDiLQR(BasiciLQR.iLQRWrapper):
                 dataset_train.update_dataset(new_data[-int(dataset_train.Trial_No/5):]) # at most update 20% dataset
                 result_path = os.path.join("logs", example_name, str(i) +".mat")
                 io.savemat(result_path,{"optimal_trajectory": self.get_traj(), "trajectroy_noisy": trajectory_noisy})
-                nn_dynamic_model.re_train(dataset_train, max_epoch = 100000, stopping_criterion = re_train_stopping_criterion)
+                nn_dynamic_model.retrain(dataset_train, max_epoch = 100000, stopping_criterion = re_train_stopping_criterion)
                 new_data = []
             else: 
                 new_data += [trajectory]
         end_time = tm.time()
+        io.savemat(os.path.join("logs", example_name,  "_result.mat"),{"obj_val": result_obj_val, "iter_time": result_iter_time})
         logger.debug("[+ +] Completed! All Time:%.5e"%(end_time-start_time))
 
 class NetiLQR(BasiciLQR.iLQRWrapper):

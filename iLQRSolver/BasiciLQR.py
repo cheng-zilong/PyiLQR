@@ -238,7 +238,7 @@ class iLQRWrapper(object):
     def clear_obj_fun_value_last(self):
         self.obj_fun_value_last = self.init_obj
     
-    def solve(self, example_name, max_iter = 100, is_check_stop = True):
+    def solve(self, example_name, max_iter = 100, is_check_stop = True, maximum_line_search = 10):
         """ Solve the problem with classical iLQR
 
             Parameter
@@ -258,7 +258,7 @@ class iLQRWrapper(object):
             iter_start_time = tm.time()
             self.backward_pass()
             backward_time = tm.time()
-            obj, isStop = self.forward_pass()
+            obj, isStop = self.forward_pass(max_line_search=maximum_line_search)
             forward_time = tm.time()
             logger.debug("[+ +] Iter.No.%3d   BWTime:%.3e   FWTime:%.3e   Obj.Val.:%.5e"%(
                          i,  backward_time-iter_start_time,forward_time-backward_time,obj))

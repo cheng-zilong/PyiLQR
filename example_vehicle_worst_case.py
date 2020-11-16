@@ -88,7 +88,7 @@ def vehicle_vanilla(T = 100, max_iter = 10000, is_check_stop = True):
     ######### Dynamic Model #########
     #################################
     vehicle, x_u, n, m = DynamicModel.vehicle()
-    init_state = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
+    init_state = np.asarray([0,0,np.pi/2,0],dtype=np.float64).reshape(-1,1)
     init_input = np.zeros((T,m,1))
     dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, init_state, init_input, T)
     #################################
@@ -100,13 +100,13 @@ def vehicle_vanilla(T = 100, max_iter = 10000, is_check_stop = True):
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = Logger.loguru_start(    file_name = file_name, 
-                                        T=T, 
-                                        max_iter = max_iter, 
-                                        is_check_stop = is_check_stop,
-                                        init_state = init_state,
-                                        C_matrix = C_matrix,
-                                        r_vector = r_vector)
+    logger_id = Logger.loguru_start(        file_name = file_name, 
+                                            T=T, 
+                                            max_iter = max_iter, 
+                                            is_check_stop = is_check_stop,
+                                            init_state = init_state,
+                                            C_matrix = C_matrix,
+                                            r_vector = r_vector)
     vehicle_example = BasiciLQR.iLQRWrapper(dynamic_model, objective_function)
     vehicle_example.solve(file_name, max_iter = max_iter, is_check_stop = is_check_stop)
     Logger.loguru_end(logger_id)
@@ -183,7 +183,7 @@ def vehicle_NNiLQR(T = 100,
     ######### Dynamic Model #########
     #################################
     vehicle, x_u, n, m = DynamicModel.vehicle()
-    init_state = np.asarray([0,0,0,0],dtype=np.float64).reshape(-1,1)
+    init_state = np.asarray([0,0,np.pi/2,0],dtype=np.float64).reshape(-1,1)
     init_input = np.zeros((T,m,1))
     dynamic_model = DynamicModel.DynamicModelWrapper(vehicle, x_u, init_state, init_input, T)
     #################################
@@ -195,20 +195,20 @@ def vehicle_NNiLQR(T = 100,
     #################################
     ########## Training #############
     #################################
-    x0_u_lower_bound = [0, 0, 0, 0, -1, -3]
-    x0_u_upper_bound = [0, 0, 0, 0,  1,  3]
+    x0_u_lower_bound = [-0, -1, -0.3, 0, -0.3, -3]
+    x0_u_upper_bound = [10,  1,  0.3, 8,  0.3,  3]
     x0_u_bound = (x0_u_lower_bound, x0_u_upper_bound)
     dataset_train = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=trial_no)
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
     if network == "large":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n),init_state, init_input, T)
-        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_large_5.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_large_1.model")
     elif network == "small":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n),init_state, init_input, T)
-        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_small_5.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_small.model")
     elif network == "residual":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallResidualNetwork(n+m, n),init_state, init_input, T)
-        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_residual_5.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch=100000, stopping_criterion = stopping_criterion, lr = 0.001, model_name = "vehicle_residual_3.model")
     #################################
     ######### iLQR Solver ###########
     #################################
@@ -310,7 +310,7 @@ def vehicle_net_iLQR(   T = 100,
 
 # %%
 if __name__ == "__main__":
-    # vehicle_vanilla(T = 100, max_iter=500, is_check_stop = False)
+    # vehicle_vanilla(T = 100, max_iter=10000, is_check_stop = True)
 
     # vehicle_log_barrier(T = 100, max_iter=10000, is_check_stop = True)
 
@@ -323,9 +323,7 @@ if __name__ == "__main__":
                         decay_rate_max_iters=300,
                         gaussian_filter_sigma = 5,
                         gaussian_noise_sigma = [[0.01], [0.1]],
-                        # network = "large")
-                        # network = "large")
-                         network = "residual")
+                        network = "large")
 
     # vehicle_net_iLQR(   T = 100,
     #                     trial_no=100,

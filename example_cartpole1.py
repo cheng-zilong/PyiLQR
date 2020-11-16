@@ -20,14 +20,15 @@ class Residual(nn.Module):
     def __init__(self, input_channels, output_channels, is_shorcut = True):
         super().__init__()
         self.is_shorcut = is_shorcut
-        self.linear1 = nn.Linear(input_channels, output_channels)
-        self.bn1 = nn.BatchNorm1d(output_channels)
+        self.bn1 = nn.BatchNorm1d(input_channels)
         self.relu = nn.ReLU()
-        self.linear2 = nn.Linear(output_channels, output_channels)
+        self.linear1 = nn.Linear(input_channels, output_channels)
+        
         self.bn2 = nn.BatchNorm1d(output_channels)
-
+        self.linear2 = nn.Linear(output_channels, output_channels)
+    
         self.shorcut = nn.Linear(input_channels, output_channels)
-        self.main_track = nn.Sequential(self.linear1, self.bn1, self.relu, self.linear2, self.bn2)
+        self.main_track = nn.Sequential(self.bn1, self.relu , self.linear1, self.bn2,  self.relu, self.linear2)
     def forward(self, X):
         if self.is_shorcut:
             Y = self.main_track(X) + self.shorcut(X)
@@ -157,42 +158,42 @@ def cartpole1_dd_iLQR(  T = 300,
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
     if network == "large":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n), init_state, init_input, T)
-        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_large.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_large_5.model")
     elif network == "small":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n), init_state, init_input, T)
-        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small.model")
-    elif network == "small_residual":
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_small.model")
+    elif network == "residual":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallResidualNetwork(n+m, n), init_state, init_input, T)
-        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small_residual.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_residual_5.model")
 
     #################################
     ######### iLQR Solver ###########
     #################################
-    logger_id = Logger.loguru_start(   file_name = file_name, 
-                                            T=T, 
-                                            trial_no = trial_no,  
-                                            stopping_criterion = stopping_criterion,  
-                                            max_iter = max_iter, 
-                                            max_line_search = max_line_search,
-                                            decay_rate = decay_rate, 
-                                            decay_rate_max_iters = decay_rate_max_iters, 
-                                            gaussian_filter_sigma = gaussian_filter_sigma, 
-                                            gaussian_noise_sigma = gaussian_noise_sigma,
-                                            init_state = init_state,
-                                            obj_C = add_param_obj[0],
-                                            obj_terminal_C = add_param_obj[-1],
-                                            x0_u_lower_bound = x0_u_lower_bound,
-                                            x0_u_upper_bound = x0_u_upper_bound,
-                                            is_use_large_net = network)
-    cartpole1_example = AdvancediLQR.DDiLQR(dynamic_model, objective_function)
-    cartpole1_example.solve(file_name, nn_dynamic_model, dataset_train,
-                                    re_train_stopping_criterion=stopping_criterion, 
-                                    max_iter=max_iter,
+    logger_id = Logger.loguru_start(file_name = file_name, 
+                                    T=T, 
+                                    trial_no = trial_no,  
+                                    stopping_criterion = stopping_criterion,  
+                                    max_iter = max_iter, 
                                     max_line_search = max_line_search,
-                                    decay_rate=decay_rate,
-                                    decay_rate_max_iters=decay_rate_max_iters,
-                                    gaussian_filter_sigma = gaussian_filter_sigma,
-                                    gaussian_noise_sigma = gaussian_noise_sigma)
+                                    decay_rate = decay_rate, 
+                                    decay_rate_max_iters = decay_rate_max_iters, 
+                                    gaussian_filter_sigma = gaussian_filter_sigma, 
+                                    gaussian_noise_sigma = gaussian_noise_sigma,
+                                    init_state = init_state,
+                                    obj_C = add_param_obj[0],
+                                    obj_terminal_C = add_param_obj[-1],
+                                    x0_u_lower_bound = x0_u_lower_bound,
+                                    x0_u_upper_bound = x0_u_upper_bound,
+                                    is_use_large_net = network)
+    cartpole1_example = AdvancediLQR.NNiLQR(dynamic_model, objective_function)
+    cartpole1_example.solve(file_name, nn_dynamic_model, dataset_train,
+                            re_train_stopping_criterion=stopping_criterion, 
+                            max_iter=max_iter,
+                            max_line_search = max_line_search,
+                            decay_rate=decay_rate,
+                            decay_rate_max_iters=decay_rate_max_iters,
+                            gaussian_filter_sigma = gaussian_filter_sigma,
+                            gaussian_noise_sigma = gaussian_noise_sigma)
     Logger.loguru_end(logger_id)
 
 def cartpole1_net_iLQR( T = 300, 
@@ -233,13 +234,13 @@ def cartpole1_net_iLQR( T = 300,
     dataset_vali = DynamicModel.DynamicModelDataSetWrapper(dynamic_model, x0_u_bound, Trial_No=10) 
     if network == "large":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(LargeNetwork(n+m, n), init_state, init_input, T)
-        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_large.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_large.model")
     elif network == "small":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallNetwork(n+m, n), init_state, init_input, T)
-        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small.model")
     elif network == "small_residual":
         nn_dynamic_model = DynamicModel.NeuralDynamicModelWrapper(SmallResidualNetwork(n+m, n), init_state, init_input, T)
-        nn_dynamic_model.pre_train(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small_residual.model")
+        nn_dynamic_model.pretrain(dataset_train, dataset_vali, max_epoch = 100000, stopping_criterion=stopping_criterion, lr = 0.001, model_name = "cartpole1_neural_small_residual.model")
     #################################
     ######### iLQR Solver ###########
     #################################
@@ -270,7 +271,7 @@ def cartpole1_net_iLQR( T = 300,
 
 # %%
 if __name__ == "__main__":
-    # cartpole1_vanilla(T = 150, max_iter=10000, is_check_stop = True)
+    # cartpole1_vanilla(T = 150, max_iter=500, is_check_stop = False)
 
     cartpole1_dd_iLQR(  T = 150,
                         trial_no=100,
@@ -281,7 +282,7 @@ if __name__ == "__main__":
                         decay_rate_max_iters=200,
                         gaussian_filter_sigma = 5,
                         gaussian_noise_sigma = 1,
-                        network = "small")
+                        network = "large")
 
     # cartpole1_net_iLQR( T = 150,
     #                     trial_no=100,

@@ -266,7 +266,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
         self.F_matrix_all = torch.zeros(self.T, self.n, self.n+self.m).cuda()
         self.const_param = torch.eye(self.n).cuda()
 
-    def pre_train(self, dataset_train, dataset_vali, max_epoch=50000, stopping_criterion = 1e-3, lr = 1e-3, model_name = "NeuralDynamic.model"):
+    def pretrain(self, dataset_train, dataset_vali, max_epoch=50000, stopping_criterion = 1e-3, lr = 1e-3, model_name = "NeuralDynamic.model"):
         """ Pre-train the model by using randomly generalized data
 
             Parameters
@@ -288,6 +288,9 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
         """
         # if the model exists, load the model directly
         model_path = os.path.join("models", model_name)
+        result_train_loss = np.zeros(max_epoch) 
+        result_vali_loss = np.zeros(int(max_epoch/100)) 
+
         if not os.path.exists(model_path):
             logger_id = logger.add(os.path.join("models", model_name + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".log"), format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - {message}")
             logger.debug("[+ +] Model file \"" + model_name + "\" does NOT exist. Pre-traning starts...")
@@ -297,6 +300,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
             optimizer = optim.RAdam(self.model.parameters(), lr=lr, weight_decay=1e-4)
             X_train, Y_train = dataset_train.get_data()
             X_vali, Y_vali = dataset_vali.get_data()  
+            time_start_pretraining = tm.time()
             for epoch in range(max_epoch):
                 #################
                 #### Training ###
@@ -307,6 +311,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                 obj_train = loss_fun(Y_prediction, Y_train) 
                 obj_train.backward()                   
                 optimizer.step()
+                result_train_loss[epoch] = obj_train.item()
                 if obj_train.item() < stopping_criterion or epoch % 100 == 0: # Check stopping criterion
                     #################
                     ## Evaluation ###
@@ -317,13 +322,18 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                     #################
                     ##### Print #####
                     #################
-                    logger.debug("[+ +] Epoch: %5d     Train Obj: %.5e     Vali Obj:%.5e"%(
+                    logger.debug("[+ +] Epoch: %5d     Train Loss: %.5e     Vali Loss:%.5e"%(
                             epoch + 1,      obj_train.item(),  obj_vali.item()))
-                    self.writer.add_scalar('Obj/train', obj_train.item(), epoch)
-                    self.writer.add_scalar('Obj/Vali', obj_vali.item(), epoch)
+                    self.writer.add_scalar('Loss/train', obj_train.item(), epoch)
+                    self.writer.add_scalar('Loss/Vali', obj_vali.item(), epoch)
+                    result_vali_loss[int(np.ceil(epoch/100))] = obj_vali.item()
                     if obj_train.item() < stopping_criterion:
-                        logger.debug("[+ +] Pre-training finished! Model file \"" + model_name + "\" is saved!")
-                        torch.save(self.model.state_dict(), model_path)         
+                        time_end_preraining = tm.time()
+                        time_pretraining = time_end_preraining - time_start_pretraining
+                        logger.debug("[+ +] Pretraining finished! Model file \"" + model_name + "\" is saved!")
+                        logger.debug("[+ +] Pretraining time: %.8f"%(time_pretraining))
+                        torch.save(self.model.state_dict(), model_path)     
+                        io.savemat(os.path.join("models", model_name + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".mat"), {"Train_loss": result_train_loss, "Vali_loss": result_vali_loss})
                         logger.remove(logger_id)
                         return
             raise Exception("Maximum epoch is reached!")
@@ -333,7 +343,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
             logger.debug("[+ +] Loading Completed!")
             self.model.eval()
 
-    def re_train(self, dataset, max_epoch=10000, stopping_criterion = 1e-3, lr = 0.001):
+    def retrain(self, dataset, max_epoch=10000, stopping_criterion = 1e-3, lr = 0.001):
         logger.debug("[+ +] Re-traning starts...")
         loss_fun = nn.MSELoss()
         # optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9)
