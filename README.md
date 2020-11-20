@@ -1,1 +1,1 @@
-# iLQR_Numpy
+# PyiLQR

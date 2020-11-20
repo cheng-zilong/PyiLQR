@@ -302,9 +302,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
             X_vali, Y_vali = dataset_vali.get_data()  
             time_start_pretraining = tm.time()
             for epoch in range(max_epoch):
-                #################
                 #### Training ###
-                #################
                 self.model.train()
                 optimizer.zero_grad()
                 Y_prediction = self.model(X_train)         
@@ -313,15 +311,11 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                 optimizer.step()
                 result_train_loss[epoch] = obj_train.item()
                 if obj_train.item() < stopping_criterion or epoch % 100 == 0: # Check stopping criterion
-                    #################
                     ## Evaluation ###
-                    #################
                     self.model.eval()
                     Y_prediction = self.model(X_vali)         # Forward Propagation
                     obj_vali = loss_fun(Y_prediction, Y_vali)
-                    #################
                     ##### Print #####
-                    #################
                     logger.debug("[+ +] Epoch: %5d     Train Loss: %.5e     Vali Loss:%.5e"%(
                             epoch + 1,      obj_train.item(),  obj_vali.item()))
                     self.writer.add_scalar('Loss/train', obj_train.item(), epoch)
@@ -350,9 +344,7 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
         optimizer = optim.RAdam(self.model.parameters(), lr=lr, weight_decay=1e-4)
         X_train, Y_train = dataset.get_data()
         for epoch in range(max_epoch):
-            #################
             #### Training ###
-            #################
             self.model.train()
             optimizer.zero_grad()
             Y_prediction = self.model(X_train)         
@@ -406,8 +398,6 @@ class NeuralDynamicModelWrapper(DynamicModelWrapper):
                 new_traj[tau+1,0:self.n,0] = self.model(torch.from_numpy(new_traj[tau,:].T).float().cuda()).cpu().double().numpy()
             # dont care the input at the last time stamp, because it is always zero
         return new_traj
-
-
 
     def eval_grad_dynamic_model(self, trajectory):
         trajectory_cuda = torch.from_numpy(trajectory[:,:,0]).float().cuda()
