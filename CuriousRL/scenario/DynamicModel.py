@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 from datetime import datetime
 from loguru import logger
-
+import torch.tensor
 torch.manual_seed(42)
 device = "cuda:0"
 class DynamicModelDataSetWrapper(object):
